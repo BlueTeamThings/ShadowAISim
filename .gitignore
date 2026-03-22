@@ -1,0 +1,56 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+*.whl
+
+# Virtual environments
+venv/
+.venv/
+env/
+.env/
+*.venv_path
+
+# Environment variables / secrets
+.env
+.env.*
+*.env
+
+# Playwright
+playwright/.local-browsers/
+.playwright/
+
+# Reports (generated output — not source)
+reports/*.json
+reports/*.html
+
+# Logs
+*.log
+logs/
+
+# OS artifacts
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.bak
+
+# Claude Code settings (local overrides)
+.claude/settings.local.json

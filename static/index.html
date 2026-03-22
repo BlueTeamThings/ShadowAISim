@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Shadow AI Simulator</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    html, body { height: 100%; margin: 0; overflow: hidden; }
+    #terminal  { font-family: 'Courier New', Consolas, monospace; font-size: 11.5px; line-height: 1.6; }
+    .nav-item  { transition: background .15s, color .15s; }
+    .nav-item.active { background: #312e81; color: #a5b4fc; }
+    .spin { animation: spin 1s linear infinite; display: inline-block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .card-btn  { transition: background .15s, border-color .15s; }
+    .section   { display: none; }
+    .section.active { display: block; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #1e293b; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+  </style>
+</head>
+<body class="bg-gray-950 text-gray-100 flex flex-col" style="height:100vh;">
+
+  <!-- Top bar -->
+  <header class="flex items-center justify-between px-5 py-3 bg-gray-900 border-b border-gray-800 shrink-0">
+    <div class="flex items-center gap-3">
+      <div class="w-7 h-7 rounded-md bg-indigo-600 flex items-center justify-center text-xs font-black">AI</div>
+      <span class="font-bold text-sm tracking-tight">Shadow AI Simulator</span>
+      <span class="text-xs text-gray-500 ml-2">Red Team &amp; DLP Validation Toolkit</span>
+    </div>
+    <div class="flex items-center gap-3">
+      <span id="ws-dot" class="inline-block w-2 h-2 rounded-full bg-gray-600"></span>
+      <span id="ws-label" class="text-xs text-gray-500">Connecting…</span>
+    </div>
+  </header>
+
+  <!-- Body: sidebar + content + terminal -->
+  <div class="flex flex-1 overflow-hidden">
+
+    <!-- Sidebar -->
+    <nav class="w-48 bg-gray-900 border-r border-gray-800 flex flex-col shrink-0 py-3">
+      <div class="px-3 mb-2">
+        <p class="text-xs font-semibold text-gray-500 uppercase tracking-widest px-2">Navigation</p>
+      </div>
+      <button class="nav-item active text-left px-5 py-2.5 text-sm font-medium rounded-lg mx-2 mb-0.5"
+              data-section="dashboard" onclick="showSection('dashboard')">
+        📊 Dashboard
+      </button>
+      <button class="nav-item text-left px-5 py-2.5 text-sm font-medium rounded-lg mx-2 mb-0.5"
+              data-section="installers" onclick="showSection('installers')">
+        📦 App Installers
+      </button>
+      <button class="nav-item text-left px-5 py-2.5 text-sm font-medium rounded-lg mx-2 mb-0.5"
+              data-section="web-leakage" onclick="showSection('web-leakage')">
+        🌐 Web Data Leakage
+      </button>
+      <button class="nav-item text-left px-5 py-2.5 text-sm font-medium rounded-lg mx-2 mb-0.5"
+              data-section="api-probe" onclick="showSection('api-probe')">
+        🔌 API Probe
+      </button>
+      <button class="nav-item text-left px-5 py-2.5 text-sm font-medium rounded-lg mx-2 mb-0.5"
+              data-section="audit" onclick="showSection('audit')">
+        🚀 Full Audit
+      </button>
+      <button class="nav-item text-left px-5 py-2.5 text-sm font-medium rounded-lg mx-2 mb-0.5"
+              data-section="reports" onclick="showSection('reports')">
+        📄 Reports
+      </button>
+    </nav>
+
+    <!-- Main content + terminal stack -->
+    <div class="flex flex-col flex-1 overflow-hidden">
+
+      <!-- Scrollable main content -->
+      <main id="main-content" class="flex-1 overflow-y-auto p-6">
+
+        <!-- ═══════════════════════════════ DASHBOARD ═══════════════════════ -->
+        <div id="section-dashboard" class="section active">
+          <h2 class="text-xl font-bold mb-1">Dashboard</h2>
+          <p class="text-gray-400 text-sm mb-6">Simulate unauthorized AI usage to validate your DLP, EDR, and SIEM detection capabilities.</p>
+
+          <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 text-center">
+              <div class="text-3xl font-bold text-indigo-400">26</div>
+              <div class="text-xs text-gray-500 mt-1">AI App Installers</div>
+            </div>
+            <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 text-center">
+              <div class="text-3xl font-bold text-red-400">5</div>
+              <div class="text-xs text-gray-500 mt-1">Browser Leak Targets</div>
+            </div>
+            <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 text-center">
+              <div class="text-3xl font-bold text-amber-400">2</div>
+              <div class="text-xs text-gray-500 mt-1">API Probe Endpoints</div>
+            </div>
+            <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 text-center">
+              <div class="text-3xl font-bold text-green-400">3</div>
+              <div class="text-xs text-gray-500 mt-1">Audit Phases</div>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-8">
+            <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
+              <div class="text-red-400 text-lg mb-2">🎭 Fake Data Payloads</div>
+              <ul class="text-sm text-gray-400 space-y-1">
+                <li>• PII — employee records, SSNs, CC numbers</li>
+                <li>• Source Code — credentials, API keys, DB strings</li>
+                <li>• Financial — MNPI, earnings projections, M&amp;A data</li>
+              </ul>
+            </div>
+            <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
+              <div class="text-amber-400 text-lg mb-2">🌐 Web Simulation</div>
+              <ul class="text-sm text-gray-400 space-y-1">
+                <li>• Headless Chromium visits AI chat sites</li>
+                <li>• Simulates pasting sensitive data into inputs</li>
+                <li>• Real DNS, TLS, and HTTP traffic generated</li>
+              </ul>
+            </div>
+            <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
+              <div class="text-indigo-400 text-lg mb-2">🔌 API Probes</div>
+              <ul class="text-sm text-gray-400 space-y-1">
+                <li>• Direct POST to OpenAI &amp; Anthropic APIs</li>
+                <li>• Triggers deep packet inspection &amp; CASB</li>
+                <li>• 401 expected — traffic is what matters</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="flex gap-3">
+            <button onclick="showSection('audit')"
+              class="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold px-6 py-3 rounded-lg text-sm transition-colors">
+              🚀 Run Full Shadow AI Audit
+            </button>
+            <button onclick="showSection('web-leakage')"
+              class="bg-gray-800 hover:bg-gray-700 border border-gray-700 text-sm font-medium px-5 py-3 rounded-lg transition-colors">
+              Browse Targets
+            </button>
+          </div>
+        </div>
+
+        <!-- ═══════════════════════════════ INSTALLERS ══════════════════════ -->
+        <div id="section-installers" class="section">
+          <h2 class="text-xl font-bold mb-1">AI App Installers</h2>
+          <p class="text-gray-400 text-sm mb-6">Downloads and silently installs each AI application on this system. On Linux: AppImages land in <code class="bg-gray-800 px-1 rounded">~/.local/bin</code>, .deb packages via apt/dpkg. On macOS: .app bundles copied to <code class="bg-gray-800 px-1 rounded">/Applications</code>. On Windows: silent /S or /VERYSILENT flags used.</p>
+
+          <!-- Local AI Models -->
+          <div class="mb-8">
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="font-semibold text-gray-300">Local AI Models &amp; Desktop Apps</h3>
+              <button onclick="apiPost('/api/installers/group/local-ai')"
+                class="card-btn text-xs bg-gray-800 hover:bg-gray-700 border border-gray-700 px-3 py-1.5 rounded-lg">
+                Install All (11)
+              </button>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              <div class="installer-card" data-id="ollama" data-name="Ollama" data-desc="Local LLM runner for Llama, Mistral, Gemma and more."></div>
+              <div class="installer-card" data-id="lmstudio" data-name="LM Studio" data-desc="GUI desktop app for running local AI models."></div>
+              <div class="installer-card" data-id="gpt4all" data-name="GPT4All" data-desc="Privacy-first local AI chat application."></div>
+              <div class="installer-card" data-id="jan" data-name="Jan AI" data-desc="Open-source local ChatGPT alternative."></div>
+              <div class="installer-card" data-id="chatgpt_desktop" data-name="ChatGPT Desktop" data-desc="Official OpenAI desktop app — all conversations sent to OpenAI cloud."></div>
+              <div class="installer-card" data-id="claude_desktop" data-name="Claude Desktop" data-desc="Official Anthropic desktop application."></div>
+              <div class="installer-card" data-id="anythingllm" data-name="AnythingLLM" data-desc="All-in-one RAG/agent desktop app — docs sent to configured AI provider."></div>
+              <div class="installer-card" data-id="msty" data-name="Msty" data-desc="Universal AI desktop client — connects to OpenAI, Anthropic, Groq, local models."></div>
+              <div class="installer-card" data-id="poe" data-name="Poe (Quora)" data-desc="Multi-model AI chat aggregator — all chats routed through Poe cloud."></div>
+              <div class="installer-card" data-id="copilot_app" data-name="Microsoft Copilot" data-desc="Microsoft standalone AI assistant — queries sent to Azure OpenAI cloud."></div>
+              <div class="installer-card" data-id="open_webui" data-name="Open WebUI" data-desc="Self-hosted AI frontend bridging local Ollama and cloud LLM APIs."></div>
+            </div>
+          </div>
+
+          <!-- AI Browsers -->
+          <div class="mb-8">
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="font-semibold text-gray-300">AI-Integrated Browsers <span class="text-xs text-red-400 ml-2">High Data Risk</span></h3>
+              <button onclick="apiPost('/api/installers/group/browsers')"
+                class="card-btn text-xs bg-gray-800 hover:bg-gray-700 border border-gray-700 px-3 py-1.5 rounded-lg">
+                Install All (7)
+              </button>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              <div class="installer-card" data-id="arc" data-name="Arc Browser (Arc Max)" data-desc="AI-first browser — browsing context sent to AI summarizers."></div>
+              <div class="installer-card" data-id="opera" data-name="Opera One" data-desc="Built-in AI assistant (Aria) — high data exfiltration risk."></div>
+              <div class="installer-card" data-id="dia" data-name="Dia Browser" data-desc="AI-native browser by The Browser Company — all tabs sent to AI cloud."></div>
+              <div class="installer-card" data-id="brave" data-name="Brave Browser (Leo AI)" data-desc="Privacy browser with Leo AI — queries sent to Anthropic/Meta cloud."></div>
+              <div class="installer-card" data-id="edge_copilot" data-name="Microsoft Edge (Copilot)" data-desc="Copilot AI sidebar — browsing context sent to Microsoft Azure."></div>
+              <div class="installer-card" data-id="perplexity_app" data-name="Perplexity Desktop" data-desc="AI search/answer engine — all queries sent to Perplexity cloud."></div>
+              <div class="installer-card" data-id="genspark" data-name="Genspark" data-desc="AI super-agent search platform — queries sent to Genspark AI cloud."></div>
+            </div>
+          </div>
+
+          <!-- Productivity Tools -->
+          <div class="mb-8">
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="font-semibold text-gray-300">AI Productivity &amp; Coding Tools <span class="text-xs text-amber-400 ml-2">Data Leakers</span></h3>
+              <button onclick="apiPost('/api/installers/group/productivity')"
+                class="card-btn text-xs bg-gray-800 hover:bg-gray-700 border border-gray-700 px-3 py-1.5 rounded-lg">
+                Install All (8)
+              </button>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              <div class="installer-card" data-id="cursor" data-name="Cursor IDE" data-desc="AI-first code editor — sends code context to OpenAI/Anthropic."></div>
+              <div class="installer-card" data-id="windsurf" data-name="Windsurf (Codeium)" data-desc="Agentic AI IDE — auto-completes and sends code to cloud."></div>
+              <div class="installer-card" data-id="notion" data-name="Notion AI" data-desc="Note-taking with AI — document contents sent to OpenAI."></div>
+              <div class="installer-card" data-id="gh_copilot" data-name="GitHub Copilot CLI" data-desc="AI coding assistant — sends shell commands &amp; code to GitHub AI."></div>
+              <div class="installer-card" data-id="zed" data-name="Zed Editor (AI)" data-desc="Collaborative AI code editor — sends code context to Anthropic/OpenAI."></div>
+              <div class="installer-card" data-id="trae" data-name="Trae IDE (ByteDance)" data-desc="AI-native IDE by ByteDance — code sent to ByteDance AI cloud."></div>
+              <div class="installer-card" data-id="augment" data-name="Augment Code" data-desc="AI coding assistant with repo awareness — codebase sent to Augment cloud."></div>
+              <div class="installer-card" data-id="codeium_ext" data-name="Codeium Desktop" data-desc="AI code completion — code snippets and context sent to Codeium cloud."></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ═══════════════════════════════ WEB LEAKAGE ═════════════════════ -->
+        <div id="section-web-leakage" class="section">
+          <h2 class="text-xl font-bold mb-1">Web Data Leakage Simulation</h2>
+          <p class="text-gray-400 text-sm mb-6">
+            Playwright headless Chromium visits each AI site and simulates pasting sensitive corporate data (PII, source code, financial projections) into visible input fields.
+          </p>
+          <div class="flex gap-3 mb-6 flex-wrap">
+            <button onclick="apiPost('/api/web-leakage/all')"
+              class="bg-red-700 hover:bg-red-600 text-white font-semibold px-5 py-2.5 rounded-lg text-sm">
+              Simulate All Sites
+            </button>
+            <button onclick="apiPost('/api/web-leakage/open-all')"
+              title="Open each site in a browser without entering any data — close the window to continue to the next"
+              class="bg-indigo-800 hover:bg-indigo-700 border border-indigo-700 text-white font-semibold px-5 py-2.5 rounded-lg text-sm">
+              Open All (No Data)
+            </button>
+            <button onclick="apiPost('/api/web-leakage/check-all')"
+              class="bg-gray-700 hover:bg-gray-600 border border-gray-600 text-white font-semibold px-5 py-2.5 rounded-lg text-sm">
+              Check All Availability
+            </button>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="leakage-cards">
+
+            <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
+              <div class="flex justify-between items-start mb-3">
+                <div>
+                  <p class="font-semibold">ChatGPT</p>
+                  <p class="text-xs text-gray-500 mt-0.5">chatgpt.com</p>
+                </div>
+                <span class="text-xs bg-red-900 text-red-300 px-2 py-0.5 rounded-full">PII</span>
+              </div>
+              <p class="text-xs text-gray-400 mb-3">Employee records, SSNs, credit card numbers.</p>
+              <div class="flex gap-2">
+                <button onclick="apiPost('/api/web-leakage/chatgpt')"
+                  class="card-btn flex-1 bg-gray-800 hover:bg-red-900 border border-gray-700 hover:border-red-800 text-sm py-2 rounded-lg">
+                  Simulate Leak
+                </button>
+                <button onclick="apiPost('/api/web-leakage/open/chatgpt')"
+                  title="Open site in browser — no data will be entered. Close the window when done."
+                  class="card-btn bg-indigo-900 hover:bg-indigo-800 border border-indigo-800 text-sm px-3 py-2 rounded-lg text-indigo-300">
+                  Open
+                </button>
+                <button onclick="apiPost('/api/web-leakage/check/chatgpt')"
+                  title="Visit site and check if it loads without entering data"
+                  class="card-btn bg-gray-800 hover:bg-gray-700 border border-gray-700 text-sm px-3 py-2 rounded-lg text-gray-400">
+                  ✓
+                </button>
+              </div>
+            </div>
+
+            <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
+              <div class="flex justify-between items-start mb-3">
+                <div>
+                  <p class="font-semibold">Claude (Anthropic)</p>
+                  <p class="text-xs text-gray-500 mt-0.5">claude.ai</p>
+                </div>
+                <span class="text-xs bg-orange-900 text-orange-300 px-2 py-0.5 rounded-full">Source Code</span>
+              </div>
+              <p class="text-xs text-gray-400 mb-3">Proprietary code + production API keys &amp; DB credentials.</p>
+              <div class="flex gap-2">
+                <button onclick="apiPost('/api/web-leakage/claude')"
+                  class="card-btn flex-1 bg-gray-800 hover:bg-red-900 border border-gray-700 hover:border-red-800 text-sm py-2 rounded-lg">
+                  Simulate Leak
+                </button>
+                <button onclick="apiPost('/api/web-leakage/open/claude')"
+                  title="Open site in browser — no data will be entered. Close the window when done."
+                  class="card-btn bg-indigo-900 hover:bg-indigo-800 border border-indigo-800 text-sm px-3 py-2 rounded-lg text-indigo-300">
+                  Open
+                </button>
+                <button onclick="apiPost('/api/web-leakage/check/claude')"
+                  title="Visit site and check if it loads without entering data"
+                  class="card-btn bg-gray-800 hover:bg-gray-700 border border-gray-700 text-sm px-3 py-2 rounded-lg text-gray-400">
+                  ✓
+                </button>
+              </div>
+            </div>
+
+            <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
+              <div class="flex justify-between items-start mb-3">
+                <div>
+                  <p class="font-semibold">Google Gemini</p>
+                  <p class="text-xs text-gray-500 mt-0.5">gemini.google.com</p>
+                </div>
+                <span class="text-xs bg-yellow-900 text-yellow-300 px-2 py-0.5 rounded-full">Financial MNPI</span>
+              </div>
+              <p class="text-xs text-gray-400 mb-3">CONFIDENTIAL Q3 earnings, M&amp;A data, restructuring plans.</p>
+              <div class="flex gap-2">
+                <button onclick="apiPost('/api/web-leakage/gemini')"
+                  class="card-btn flex-1 bg-gray-800 hover:bg-red-900 border border-gray-700 hover:border-red-800 text-sm py-2 rounded-lg">
+                  Simulate Leak
+                </button>
+                <button onclick="apiPost('/api/web-leakage/open/gemini')"
+                  title="Open site in browser — no data will be entered. Close the window when done."
+                  class="card-btn bg-indigo-900 hover:bg-indigo-800 border border-indigo-800 text-sm px-3 py-2 rounded-lg text-indigo-300">
+                  Open
+                </button>
+                <button onclick="apiPost('/api/web-leakage/check/gemini')"
+                  title="Visit site and check if it loads without entering data"
+                  class="card-btn bg-gray-800 hover:bg-gray-700 border border-gray-700 text-sm px-3 py-2 rounded-lg text-gray-400">
+                  ✓
+                </button>
+              </div>
+            </div>
+
+            <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
+              <div class="flex justify-between items-start mb-3">
+                <div>
+                  <p class="font-semibold">Perplexity AI</p>
+                  <p class="text-xs text-gray-500 mt-0.5">perplexity.ai</p>
+                </div>
+                <span class="text-xs bg-red-900 text-red-300 px-2 py-0.5 rounded-full">PII</span>
+              </div>
+              <p class="text-xs text-gray-400 mb-3">Employee records, SSNs, credit card numbers.</p>
+              <div class="flex gap-2">
+                <button onclick="apiPost('/api/web-leakage/perplexity')"
+                  class="card-btn flex-1 bg-gray-800 hover:bg-red-900 border border-gray-700 hover:border-red-800 text-sm py-2 rounded-lg">
+                  Simulate Leak
+                </button>
+                <button onclick="apiPost('/api/web-leakage/open/perplexity')"
+                  title="Open site in browser — no data will be entered. Close the window when done."
+                  class="card-btn bg-indigo-900 hover:bg-indigo-800 border border-indigo-800 text-sm px-3 py-2 rounded-lg text-indigo-300">
+                  Open
+                </button>
+                <button onclick="apiPost('/api/web-leakage/check/perplexity')"
+                  title="Visit site and check if it loads without entering data"
+                  class="card-btn bg-gray-800 hover:bg-gray-700 border border-gray-700 text-sm px-3 py-2 rounded-lg text-gray-400">
+                  ✓
+                </button>
+              </div>
+            </div>
+
+            <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
+              <div class="flex justify-between items-start mb-3">
+                <div>
+                  <p class="font-semibold">Hugging Face Chat</p>
+                  <p class="text-xs text-gray-500 mt-0.5">huggingface.co/chat</p>
+                </div>
+                <span class="text-xs bg-orange-900 text-orange-300 px-2 py-0.5 rounded-full">Source Code</span>
+              </div>
+              <p class="text-xs text-gray-400 mb-3">Proprietary trading algorithm + production credentials.</p>
+              <div class="flex gap-2">
+                <button onclick="apiPost('/api/web-leakage/huggingface')"
+                  class="card-btn flex-1 bg-gray-800 hover:bg-red-900 border border-gray-700 hover:border-red-800 text-sm py-2 rounded-lg">
+                  Simulate Leak
+                </button>
+                <button onclick="apiPost('/api/web-leakage/open/huggingface')"
+                  title="Open site in browser — no data will be entered. Close the window when done."
+                  class="card-btn bg-indigo-900 hover:bg-indigo-800 border border-indigo-800 text-sm px-3 py-2 rounded-lg text-indigo-300">
+                  Open
+                </button>
+                <button onclick="apiPost('/api/web-leakage/check/huggingface')"
+                  title="Visit site and check if it loads without entering data"
+                  class="card-btn bg-gray-800 hover:bg-gray-700 border border-gray-700 text-sm px-3 py-2 rounded-lg text-gray-400">
+                  ✓
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- ═══════════════════════════════ API PROBE ═══════════════════════ -->
+        <div id="section-api-probe" class="section">
+          <h2 class="text-xl font-bold mb-1">Direct API Endpoint Probe</h2>
+          <p class="text-gray-400 text-sm mb-6">
+            Sends POST requests with fake sensitive payloads directly to AI API endpoints. Designed to trigger deep packet inspection, CASB, and network proxies.
+            A <code class="bg-gray-800 px-1 rounded">401 Unauthorized</code> response is expected — the network traffic is what detection tools should catch.
+          </p>
+          <div class="flex gap-3 mb-6">
+            <button onclick="apiPost('/api/probe/all')"
+              class="bg-red-700 hover:bg-red-600 text-white font-semibold px-5 py-2.5 rounded-lg text-sm">
+              Probe All Endpoints
+            </button>
+          </div>
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+
+            <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
+              <div class="flex justify-between items-start mb-4">
+                <div>
+                  <p class="font-semibold">OpenAI Chat Completions</p>
+                  <p class="text-xs font-mono text-gray-500 mt-0.5">POST api.openai.com/v1/chat/completions</p>
+                </div>
+                <span class="text-xs bg-yellow-900 text-yellow-300 px-2 py-0.5 rounded-full shrink-0">Financial MNPI</span>
+              </div>
+              <div class="bg-black rounded-lg p-3 mb-4 text-xs font-mono text-gray-400 overflow-x-auto">
+                <div class="text-indigo-400">Authorization: Bearer sk-simulated-red-team-…</div>
+                <div class="text-gray-500">body: &#123; model: "gpt-4", messages: [CONFIDENTIAL Q3 Earnings…] &#125;</div>
+              </div>
+              <button onclick="apiPost('/api/probe/openai')"
+                class="card-btn w-full bg-gray-800 hover:bg-red-900 border border-gray-700 hover:border-red-800 text-sm py-2 rounded-lg">
+                Send Probe
+              </button>
+            </div>
+
+            <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
+              <div class="flex justify-between items-start mb-4">
+                <div>
+                  <p class="font-semibold">Anthropic Messages API</p>
+                  <p class="text-xs font-mono text-gray-500 mt-0.5">POST api.anthropic.com/v1/messages</p>
+                </div>
+                <span class="text-xs bg-red-900 text-red-300 px-2 py-0.5 rounded-full shrink-0">PII</span>
+              </div>
+              <div class="bg-black rounded-lg p-3 mb-4 text-xs font-mono text-gray-400 overflow-x-auto">
+                <div class="text-indigo-400">x-api-key: sk-ant-simulated-red-team-…</div>
+                <div class="text-gray-500">body: &#123; model: "claude-3-5-sonnet", messages: [SSN: 123-45-6789…] &#125;</div>
+              </div>
+              <button onclick="apiPost('/api/probe/anthropic')"
+                class="card-btn w-full bg-gray-800 hover:bg-red-900 border border-gray-700 hover:border-red-800 text-sm py-2 rounded-lg">
+                Send Probe
+              </button>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- ═══════════════════════════════ FULL AUDIT ══════════════════════ -->
+        <div id="section-audit" class="section">
+          <h2 class="text-xl font-bold mb-1">Full Shadow AI Audit</h2>
+          <p class="text-gray-400 text-sm mb-6">
+            Runs all three phases sequentially. Every action is timestamped so your security team can cross-reference against SIEM/DLP alerts to find gaps.
+          </p>
+
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-8">
+            <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
+              <div class="text-2xl mb-2">🌐</div>
+              <p class="font-semibold mb-1">Phase 1 — Web Leakage</p>
+              <p class="text-xs text-gray-400">Playwright visits 5 AI sites and simulates pasting PII, source code, and financial data into input fields.</p>
+            </div>
+            <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
+              <div class="text-2xl mb-2">🔌</div>
+              <p class="font-semibold mb-1">Phase 2 — API Probes</p>
+              <p class="text-xs text-gray-400">Direct POST requests to OpenAI and Anthropic API endpoints with fake sensitive payloads.</p>
+            </div>
+            <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
+              <div class="text-2xl mb-2">📦</div>
+              <p class="font-semibold mb-1">Phase 3 — Installer Downloads</p>
+              <p class="text-xs text-gray-400">Downloads and silently installs all 26 AI tools on this system to test EDR/DLP response to actual app installations.</p>
+            </div>
+          </div>
+
+          <div class="bg-gray-900 border border-gray-800 rounded-xl p-6 mb-6">
+            <div id="audit-idle" class="">
+              <p class="text-gray-300 mb-4">Ready to run. The audit takes 3–10 minutes depending on network speed.</p>
+              <button id="audit-btn" onclick="startAudit()"
+                class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-8 py-3 rounded-lg text-sm transition-colors">
+                🚀 Start Full Shadow AI Audit
+              </button>
+            </div>
+            <div id="audit-running" class="hidden">
+              <div class="flex items-center gap-3 mb-4">
+                <span class="spin text-indigo-400 text-xl">⟳</span>
+                <span class="font-semibold">Audit running…</span>
+                <span id="audit-phase" class="text-xs bg-indigo-900 text-indigo-300 px-2 py-0.5 rounded-full"></span>
+              </div>
+              <p class="text-sm text-gray-400">Watch the live terminal below. When complete, go to <strong>Reports</strong> to download your audit log.</p>
+            </div>
+          </div>
+
+          <div class="bg-amber-950 border border-amber-800 rounded-xl p-4 text-sm text-amber-200">
+            <strong>⚠ Authorized Testing Only:</strong> Use this tool only on networks and systems you are authorized to test.
+            All payloads are fake/simulated data. No real credentials are used. Intended for security team validation only.
+          </div>
+        </div>
+
+        <!-- ═══════════════════════════════ REPORTS ═════════════════════════ -->
+        <div id="section-reports" class="section">
+          <h2 class="text-xl font-bold mb-1">Reports</h2>
+          <p class="text-gray-400 text-sm mb-6">
+            Download a timestamped audit log to cross-reference against your SIEM, Shadow AI detector, and DLP alerts.
+          </p>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-5 mb-8">
+            <div class="bg-gray-900 border border-gray-800 rounded-xl p-6">
+              <div class="text-3xl mb-3">{ }</div>
+              <p class="font-semibold mb-1">JSON Audit Log</p>
+              <p class="text-sm text-gray-400 mb-5">Machine-readable. Contains every event with precise UTC timestamps, targets, data types, and status. Ideal for SIEM ingestion.</p>
+              <a href="/api/reports/json"
+                class="block text-center bg-indigo-700 hover:bg-indigo-600 text-white font-semibold py-2.5 rounded-lg text-sm transition-colors">
+                ⬇ Download JSON Report
+              </a>
+            </div>
+            <div class="bg-gray-900 border border-gray-800 rounded-xl p-6">
+              <div class="text-3xl mb-3">📋</div>
+              <p class="font-semibold mb-1">HTML Audit Report</p>
+              <p class="text-sm text-gray-400 mb-5">Color-coded visual report for management presentations. Shows detected vs. blocked breakdown at a glance.</p>
+              <a href="/api/reports/html"
+                class="block text-center bg-gray-700 hover:bg-gray-600 text-white font-semibold py-2.5 rounded-lg text-sm transition-colors">
+                ⬇ Download HTML Report
+              </a>
+            </div>
+          </div>
+
+          <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
+            <h3 class="font-semibold mb-3">Current Session Summary</h3>
+            <div id="report-summary" class="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div class="text-center"><div id="s-events" class="text-2xl font-bold text-gray-300">0</div><div class="text-xs text-gray-500">Events</div></div>
+              <div class="text-center"><div id="s-alerts" class="text-2xl font-bold text-red-400">0</div><div class="text-xs text-gray-500">Leak Alerts</div></div>
+              <div class="text-center"><div id="s-blocked" class="text-2xl font-bold text-yellow-400">0</div><div class="text-xs text-gray-500">Blocked</div></div>
+              <div class="text-center"><div id="s-errors" class="text-2xl font-bold text-gray-500">0</div><div class="text-xs text-gray-500">Errors</div></div>
+            </div>
+            <button onclick="refreshSummary()" class="mt-4 text-xs text-gray-500 hover:text-gray-300">↻ Refresh</button>
+          </div>
+        </div>
+
+      </main>
+
+      <!-- Terminal panel (fixed at bottom) -->
+      <div class="shrink-0 border-t border-gray-800 bg-black" style="height: 220px; display: flex; flex-direction: column;">
+        <div class="flex items-center justify-between px-4 py-1.5 border-b border-gray-900">
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-semibold text-gray-500 uppercase tracking-widest">Live Terminal</span>
+            <span id="event-count" class="text-xs text-gray-700">0 events</span>
+          </div>
+          <button onclick="clearTerminal()" class="text-xs text-gray-600 hover:text-gray-400">Clear</button>
+        </div>
+        <div id="terminal" class="flex-1 overflow-y-auto px-4 py-2 space-y-0.5"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
