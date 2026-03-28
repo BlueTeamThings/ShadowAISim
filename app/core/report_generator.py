@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 
 def build_json_report(history: list[dict]) -> str:
     summary = _summarise(history)
+    installer_events = [e for e in history if e.get("category") == "INSTALLER"]
     report = {
         "report_metadata": {
             "generated_at":   datetime.now(timezone.utc).isoformat(),
@@ -21,6 +22,24 @@ def build_json_report(history: list[dict]) -> str:
             "total_events":   len(history),
         },
         "summary": summary,
+        "installer_diagnostics": {
+            "resolved_url": [
+                {
+                    "target": e.get("target", ""),
+                    "classification": e.get("classification", ""),
+                    "resolved_url": e.get("resolved_url", ""),
+                    "fallback_url_used": e.get("fallback_url_used"),
+                    "http_status": e.get("http_status"),
+                    "dns_status": e.get("dns_status"),
+                    "installed_path": e.get("installed_path", ""),
+                    "binary_path": e.get("binary_path", ""),
+                    "pid": e.get("pid"),
+                    "remediation_hint": e.get("remediation_hint", ""),
+                }
+                for e in installer_events
+                if e.get("classification")
+            ],
+        },
         "events":  history,
     }
     return json.dumps(report, indent=2)
@@ -114,6 +133,12 @@ def build_html_report(history: list[dict]) -> str:
           <th>Level</th>
           <th>Category</th>
           <th>Target</th>
+          <th>Classification</th>
+          <th>HTTP</th>
+          <th>Resolved URL</th>
+          <th>Binary</th>
+          <th>PID</th>
+          <th>Remediation</th>
           <th>Data Type</th>
           <th>Message</th>
         </tr>
@@ -140,6 +165,12 @@ def _make_row(e: dict) -> str:
         f"<td><span class='badge lvl-{level}'>{level}</span></td>"
         f"<td class='cat'>{e.get('category','')}</td>"
         f"<td style='color:#64748b;font-size:11px;'>{e.get('target','')}</td>"
+        f"<td style='color:#a5b4fc;font-size:11px;'>{e.get('classification','')}</td>"
+        f"<td style='color:#fbbf24;font-size:11px;'>{e.get('http_status','')}</td>"
+        f"<td style='color:#94a3b8;font-size:11px;'>{e.get('resolved_url','')}</td>"
+        f"<td style='color:#94a3b8;font-size:11px;'>{e.get('binary_path','')}</td>"
+        f"<td style='color:#94a3b8;font-size:11px;'>{e.get('pid','')}</td>"
+        f"<td style='color:#f59e0b;font-size:11px;'>{e.get('remediation_hint','')}</td>"
         f"<td style='color:#f59e0b;font-size:11px;'>{e.get('data_type','')}</td>"
         f"<td class='msg'>{e.get('message','')}</td>"
         f"</tr>"
@@ -185,6 +216,22 @@ def _summarise(history: list[dict]) -> dict:
                           if e.get("category") == "INSTALLER"
                           and e.get("level") == "ERROR"
                           and "INSTALL FAILED" in e.get("message", "")),
+        "stale_url":  sum(1 for e in history
+              if e.get("category") == "INSTALLER"
+              and e.get("classification") in ("URL_INVALID_OR_STALE", "HTTP_404_NOT_FOUND")),
+        "unsupported_platform": sum(1 for e in history
+              if e.get("category") == "INSTALLER"
+              and e.get("classification") in ("PLATFORM_NOT_SUPPORTED", "NO_LINUX_BUILD_AVAILABLE")),
+        "dns_issue": sum(1 for e in history
+              if e.get("category") == "INSTALLER"
+              and e.get("classification") == "DNS_RESOLUTION_FAILED"),
+        "proxy_block": sum(1 for e in history
+              if e.get("category") == "INSTALLER"
+              and e.get("classification") == "PROXY_BLOCKED"),
+        "started_successfully": sum(1 for e in history
+              if e.get("category") == "APP"
+              and e.get("classification") == "STARTABLE"
+              and e.get("pid")),
     }
 
     # API probe breakdown

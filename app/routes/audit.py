@@ -11,7 +11,7 @@ from app.core.config import BROWSER_TARGETS, API_TARGETS, ALL_INSTALLERS
 from app.core.event_bus import bus
 from app.automation.browser import simulate_data_leakage
 from app.automation.api_calls import probe_api_endpoint
-from app.automation.installers import install_app
+from app.automation.installers import install_group
 from app.automation.mcp_servers import MCP_SERVERS, install_mcp_server, inject_mcp_config
 
 router = APIRouter()
@@ -79,11 +79,10 @@ async def _run_full_audit():
     # ── Phase 3: Installer downloads ──────────────────────────────────────────
     state.phase = "installers"
     await emit("INFO", "AUDIT", f"PHASE 3 / 4 — AI Application Installs ({len(ALL_INSTALLERS)} packages)")
-    for installer in ALL_INSTALLERS:
-        try:
-            await install_app(installer, emit)
-        except Exception as exc:
-            await emit("ERROR", "AUDIT", f"Unhandled error — {installer['name']}: {exc}")
+    try:
+        await install_group(ALL_INSTALLERS, emit, label="Audit installer phase")
+    except Exception as exc:
+        await emit("ERROR", "AUDIT", f"Unhandled installer phase error: {exc}")
 
     # ── Phase 4: MCP server installs + config injection ───────────────────────
     state.phase = "mcp"

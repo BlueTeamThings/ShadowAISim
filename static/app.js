@@ -5,6 +5,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 let eventCount  = 0;
 let auditRunning = false;
+let installerData = null;
+let installerFilter = "all";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Navigation
@@ -20,31 +22,144 @@ function showSection(id) {
   if (btn) btn.classList.add("active");
 
   if (id === "reports") refreshSummary();
+  if (id === "installers") refreshInstallers();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Installer cards (auto-render from HTML data attributes)
 // ─────────────────────────────────────────────────────────────────────────────
+async function refreshInstallers() {
+  try {
+    const resp = await fetch("/api/installers");
+    installerData = await resp.json();
+    renderInstallerCards();
+  } catch (err) {
+    appendTerminalLine({ level: "ERROR", category: "UI", message: `Installer metadata load failed: ${err}`, ts: now() });
+  }
+}
+
+function setInstallerFilter(filter) {
+  installerFilter = filter;
+  renderInstallerCards();
+}
+
+function _matchesFilter(item) {
+  if (!item) return false;
+  if (installerFilter === "all") return true;
+  if (installerFilter === "installed") return item.installed;
+  if (installerFilter === "installable") return item.supported_platforms.includes("linux");
+  if (installerFilter === "unsupported") return !item.supported_platforms.includes("linux");
+  if (installerFilter === "failed-url") return ["URL_INVALID_OR_STALE", "HTTP_404_NOT_FOUND", "DNS_RESOLUTION_FAILED"].includes(item.classification);
+  if (installerFilter === "running") return item.running;
+  return true;
+}
+
 function renderInstallerCards() {
-  document.querySelectorAll(".installer-card").forEach(el => {
-    const id   = el.dataset.id;
-    const name = el.dataset.name;
-    const desc = el.dataset.desc;
-    el.innerHTML = `
-      <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 h-full flex flex-col">
-        <div class="flex items-center gap-2 mb-2">
-          <div class="w-7 h-7 rounded-md bg-gray-800 border border-gray-700 flex items-center justify-center text-xs font-bold text-gray-400">
-            ${name.charAt(0)}
-          </div>
-          <span class="font-medium text-sm">${name}</span>
+  if (!installerData || !installerData.groups) return;
+
+  const targets = {
+    local_ai: document.getElementById("installers-local-ai-grid"),
+    browsers: document.getElementById("installers-browsers-grid"),
+    productivity: document.getElementById("installers-productivity-grid"),
+  };
+
+  Object.entries(targets).forEach(([group, host]) => {
+    if (!host) return;
+    const items = (installerData.groups[group] || []).filter(_matchesFilter);
+    if (!items.length) {
+      host.innerHTML = `<div class="col-span-3 text-xs text-gray-500 p-4">No apps match this filter.</div>`;
+      return;
+    }
+    host.innerHTML = items.map((item) => {
+      const startDisabled = item.start_enabled ? "" : "disabled";
+      const startTitle = item.start_enabled ? "" : (item.start_disabled_reason || "Install first");
+      const startButton = item.start_visible ?
+        `<button onclick="installerAction('${item.app_id}', 'start')" ${startDisabled} title="${escHtml(startTitle)}" class="card-btn text-xs bg-gray-800 hover:bg-indigo-900 border border-gray-700 py-1.5 rounded-lg disabled:opacity-40">Start</button>` :
+        "";
+      const unsupported = !item.supported_platforms.includes("linux");
+      const supportTag = unsupported ? "Unsupported on Linux" : "Installable on Linux";
+      const status = item.classification || "NOT_INSTALLED";
+      const urlText = item.latest_resolved_download_url || "(not resolved yet)";
+      const installPath = item.installed_path || "(unknown)";
+      const binaryPath = item.binary_path || "(not detected)";
+      const version = item.version || "(unknown)";
+
+      return `
+      <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 h-full flex flex-col gap-2">
+        <div class="flex items-center justify-between gap-2">
+          <div class="font-medium text-sm">${escHtml(item.display_name)}</div>
+          <span class="text-[10px] px-2 py-0.5 rounded ${unsupported ? "bg-amber-900 text-amber-300" : "bg-emerald-900 text-emerald-300"}">${supportTag}</span>
         </div>
-        <p class="text-xs text-gray-400 flex-1 mb-3">${desc}</p>
-        <button onclick="apiPost('/api/installers/${id}')"
-          class="card-btn w-full bg-gray-800 hover:bg-indigo-900 border border-gray-700 hover:border-indigo-700 text-xs py-1.5 rounded-lg text-gray-300">
-          ⚙ Install Application
-        </button>
+        <div class="text-[11px] text-gray-400">${escHtml(item.desc || "")}</div>
+        <div class="text-[11px] text-gray-500">Category: ${escHtml(item.category || "")}</div>
+        <div class="text-[11px] text-gray-500">Status: <span class="text-gray-300">${escHtml(status)}</span></div>
+        <div class="text-[11px] text-gray-500">Resolved URL: <span class="text-gray-300 break-all">${escHtml(urlText)}</span></div>
+        <div class="text-[11px] text-gray-500">Install Path: <span class="text-gray-300 break-all">${escHtml(installPath)}</span></div>
+        <div class="text-[11px] text-gray-500">Binary: <span class="text-gray-300 break-all">${escHtml(binaryPath)}</span></div>
+        <div class="text-[11px] text-gray-500 mb-2">Version: <span class="text-gray-300">${escHtml(version)}</span></div>
+        <div class="grid grid-cols-2 gap-1.5 mt-auto">
+          <button onclick="installerAction('${item.app_id}', 'install')" class="card-btn text-xs bg-gray-800 hover:bg-indigo-900 border border-gray-700 py-1.5 rounded-lg">Install</button>
+          <button onclick="installerAction('${item.app_id}', 'reinstall')" class="card-btn text-xs bg-gray-800 hover:bg-indigo-900 border border-gray-700 py-1.5 rounded-lg">Reinstall</button>
+          ${startButton}
+          <button onclick="installerAction('${item.app_id}', 'stop')" class="card-btn text-xs bg-gray-800 hover:bg-indigo-900 border border-gray-700 py-1.5 rounded-lg">Stop</button>
+          <button onclick="installerAction('${item.app_id}', 'validate')" class="card-btn text-xs bg-gray-800 hover:bg-indigo-900 border border-gray-700 py-1.5 rounded-lg">Validate</button>
+          <button onclick="installerAction('${item.app_id}', 'logs')" class="card-btn text-xs bg-gray-800 hover:bg-indigo-900 border border-gray-700 py-1.5 rounded-lg">Logs</button>
+          <button onclick="installerAction('${item.app_id}', 'folder')" class="card-btn text-xs bg-gray-800 hover:bg-indigo-900 border border-gray-700 py-1.5 rounded-lg">Open Install Folder</button>
+          <button onclick="installerAction('${item.app_id}', 'binary')" class="card-btn text-xs bg-gray-800 hover:bg-indigo-900 border border-gray-700 py-1.5 rounded-lg">Show Binary Path</button>
+        </div>
+        ${item.app_id === "ollama" ? `
+        <div class="grid grid-cols-2 gap-1.5 pt-2 border-t border-gray-800 mt-2">
+          <button onclick="installerAction('ollama', 'health')" class="card-btn text-xs bg-gray-800 hover:bg-indigo-900 border border-gray-700 py-1.5 rounded-lg">Health Check</button>
+          <button onclick="installerAction('ollama', 'service-start')" class="card-btn text-xs bg-gray-800 hover:bg-indigo-900 border border-gray-700 py-1.5 rounded-lg">Start Service</button>
+          <button onclick="installerAction('ollama', 'service-stop')" class="card-btn text-xs bg-gray-800 hover:bg-indigo-900 border border-gray-700 py-1.5 rounded-lg">Stop Service</button>
+          <button onclick="installerAction('ollama', 'service-restart')" class="card-btn text-xs bg-gray-800 hover:bg-indigo-900 border border-gray-700 py-1.5 rounded-lg">Restart Service</button>
+          <button onclick="installerAction('ollama', 'api-status')" class="card-btn text-xs bg-gray-800 hover:bg-indigo-900 border border-gray-700 py-1.5 rounded-lg">Open API Status</button>
+          <button onclick="installerAction('ollama', 'pull-baseline-model')" class="card-btn text-xs bg-gray-800 hover:bg-indigo-900 border border-gray-700 py-1.5 rounded-lg">Pull Baseline Model</button>
+        </div>` : ""}
       </div>`;
+    }).join("");
   });
+}
+
+async function installerAction(appId, action) {
+  const map = {
+    install:  { method: "POST", url: `/api/installers/${appId}` },
+    reinstall:{ method: "POST", url: `/api/installers/${appId}/reinstall` },
+    start:    { method: "POST", url: `/api/installers/${appId}/start` },
+    stop:     { method: "POST", url: `/api/installers/${appId}/stop` },
+    validate: { method: "POST", url: `/api/installers/${appId}/validate` },
+    logs:     { method: "GET",  url: `/api/installers/${appId}/logs` },
+    folder:   { method: "GET",  url: `/api/installers/${appId}/install-folder` },
+    binary:   { method: "GET",  url: `/api/installers/${appId}/binary-path` },
+    health:   { method: "POST", url: "/api/installers/ollama/health" },
+    "service-start": { method: "POST", url: "/api/installers/ollama/service/start" },
+    "service-stop": { method: "POST", url: "/api/installers/ollama/service/stop" },
+    "service-restart": { method: "POST", url: "/api/installers/ollama/service/restart" },
+    "api-status": { method: "POST", url: "/api/installers/ollama/service/api-status" },
+    "pull-baseline-model": { method: "POST", url: "/api/installers/ollama/pull-baseline-model" },
+  };
+  const req = map[action];
+  if (!req) return;
+
+  try {
+    const resp = await fetch(req.url, { method: req.method });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+      appendTerminalLine({ level: "ERROR", category: "UI", message: `Action failed (${action}): ${data.error || resp.status}`, ts: now() });
+      return;
+    }
+    if (action === "logs") {
+      const lines = data.logs || [];
+      lines.slice(-30).forEach((line) => {
+        appendTerminalLine({ level: "INFO", category: "APP", message: `${appId}: ${line}`, ts: now() });
+      });
+    } else {
+      appendTerminalLine({ level: "INFO", category: "UI", message: `${appId}: ${action} requested`, ts: now() });
+    }
+    await refreshInstallers();
+  } catch (err) {
+    appendTerminalLine({ level: "ERROR", category: "UI", message: `Action failed (${action}): ${err}`, ts: now() });
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -364,6 +479,6 @@ function renderPreflightGrid(data) {
 // ─────────────────────────────────────────────────────────────────────────────
 // Init
 // ─────────────────────────────────────────────────────────────────────────────
-renderInstallerCards();
+refreshInstallers();
 connectSSE();
 appendTerminalLine({ level: "INFO", category: "SYSTEM", message: "Shadow AI Simulator ready. Select a test or run the Full Audit.", ts: now() });

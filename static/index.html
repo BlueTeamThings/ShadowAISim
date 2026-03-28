@@ -153,71 +153,40 @@
         <!-- ═══════════════════════════════ INSTALLERS ══════════════════════ -->
         <div id="section-installers" class="section">
           <h2 class="text-xl font-bold mb-1">AI App Installers</h2>
-          <p class="text-gray-400 text-sm mb-6">Downloads and silently installs each AI application on this system. On Linux: AppImages land in <code class="bg-gray-800 px-1 rounded">~/.local/bin</code>, .deb packages via apt/dpkg. On macOS: .app bundles copied to <code class="bg-gray-800 px-1 rounded">/Applications</code>. On Windows: silent /S or /VERYSILENT flags used.</p>
+          <p class="text-gray-400 text-sm mb-4">Install, validate, and launch test apps from one place. Start is enabled when an app is installed or has a launch strategy.</p>
 
-          <!-- Local AI Models -->
+          <div class="flex flex-wrap gap-2 mb-6">
+            <button onclick="setInstallerFilter('all')" class="card-btn text-xs bg-gray-800 hover:bg-gray-700 border border-gray-700 px-3 py-1.5 rounded-lg">All</button>
+            <button onclick="setInstallerFilter('installed')" class="card-btn text-xs bg-gray-800 hover:bg-gray-700 border border-gray-700 px-3 py-1.5 rounded-lg">Installed</button>
+            <button onclick="setInstallerFilter('installable')" class="card-btn text-xs bg-gray-800 hover:bg-gray-700 border border-gray-700 px-3 py-1.5 rounded-lg">Installable on This OS</button>
+            <button onclick="setInstallerFilter('unsupported')" class="card-btn text-xs bg-gray-800 hover:bg-gray-700 border border-gray-700 px-3 py-1.5 rounded-lg">Unsupported on This OS</button>
+            <button onclick="setInstallerFilter('failed-url')" class="card-btn text-xs bg-gray-800 hover:bg-gray-700 border border-gray-700 px-3 py-1.5 rounded-lg">Failed URL Resolution</button>
+            <button onclick="setInstallerFilter('running')" class="card-btn text-xs bg-gray-800 hover:bg-gray-700 border border-gray-700 px-3 py-1.5 rounded-lg">Running</button>
+            <button onclick="refreshInstallers()" class="card-btn text-xs bg-indigo-900 hover:bg-indigo-800 border border-indigo-700 px-3 py-1.5 rounded-lg text-indigo-200">Refresh</button>
+          </div>
+
           <div class="mb-8">
             <div class="flex items-center justify-between mb-3">
               <h3 class="font-semibold text-gray-300">Local AI Models &amp; Desktop Apps</h3>
-              <button onclick="apiPost('/api/installers/group/local-ai')"
-                class="card-btn text-xs bg-gray-800 hover:bg-gray-700 border border-gray-700 px-3 py-1.5 rounded-lg">
-                Install All (11)
-              </button>
+              <button onclick="apiPost('/api/installers/group/local_ai')" class="card-btn text-xs bg-gray-800 hover:bg-gray-700 border border-gray-700 px-3 py-1.5 rounded-lg">Install All</button>
             </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-              <div class="installer-card" data-id="ollama" data-name="Ollama" data-desc="Local LLM runner for Llama, Mistral, Gemma and more."></div>
-              <div class="installer-card" data-id="lmstudio" data-name="LM Studio" data-desc="GUI desktop app for running local AI models."></div>
-              <div class="installer-card" data-id="gpt4all" data-name="GPT4All" data-desc="Privacy-first local AI chat application."></div>
-              <div class="installer-card" data-id="jan" data-name="Jan AI" data-desc="Open-source local ChatGPT alternative."></div>
-              <div class="installer-card" data-id="chatgpt_desktop" data-name="ChatGPT Desktop" data-desc="Official OpenAI desktop app — all conversations sent to OpenAI cloud."></div>
-              <div class="installer-card" data-id="claude_desktop" data-name="Claude Desktop" data-desc="Official Anthropic desktop application."></div>
-              <div class="installer-card" data-id="anythingllm" data-name="AnythingLLM" data-desc="All-in-one RAG/agent desktop app — docs sent to configured AI provider."></div>
-              <div class="installer-card" data-id="msty" data-name="Msty" data-desc="Universal AI desktop client — connects to OpenAI, Anthropic, Groq, local models."></div>
-              <div class="installer-card" data-id="poe" data-name="Poe (Quora)" data-desc="Multi-model AI chat aggregator — all chats routed through Poe cloud."></div>
-              <div class="installer-card" data-id="copilot_app" data-name="Microsoft Copilot" data-desc="Microsoft standalone AI assistant — queries sent to Azure OpenAI cloud."></div>
-              <div class="installer-card" data-id="open_webui" data-name="Open WebUI" data-desc="Self-hosted AI frontend bridging local Ollama and cloud LLM APIs."></div>
-            </div>
+            <div id="installers-local-ai-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3"></div>
           </div>
 
-          <!-- AI Browsers -->
           <div class="mb-8">
             <div class="flex items-center justify-between mb-3">
-              <h3 class="font-semibold text-gray-300">AI-Integrated Browsers <span class="text-xs text-red-400 ml-2">High Data Risk</span></h3>
-              <button onclick="apiPost('/api/installers/group/browsers')"
-                class="card-btn text-xs bg-gray-800 hover:bg-gray-700 border border-gray-700 px-3 py-1.5 rounded-lg">
-                Install All (7)
-              </button>
+              <h3 class="font-semibold text-gray-300">AI-Integrated Browsers</h3>
+              <button onclick="apiPost('/api/installers/group/browsers')" class="card-btn text-xs bg-gray-800 hover:bg-gray-700 border border-gray-700 px-3 py-1.5 rounded-lg">Install All</button>
             </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-              <div class="installer-card" data-id="arc" data-name="Arc Browser (Arc Max)" data-desc="AI-first browser — browsing context sent to AI summarizers."></div>
-              <div class="installer-card" data-id="opera" data-name="Opera One" data-desc="Built-in AI assistant (Aria) — high data exfiltration risk."></div>
-              <div class="installer-card" data-id="dia" data-name="Dia Browser" data-desc="AI-native browser by The Browser Company — all tabs sent to AI cloud."></div>
-              <div class="installer-card" data-id="brave" data-name="Brave Browser (Leo AI)" data-desc="Privacy browser with Leo AI — queries sent to Anthropic/Meta cloud."></div>
-              <div class="installer-card" data-id="edge_copilot" data-name="Microsoft Edge (Copilot)" data-desc="Copilot AI sidebar — browsing context sent to Microsoft Azure."></div>
-              <div class="installer-card" data-id="perplexity_app" data-name="Perplexity Desktop" data-desc="AI search/answer engine — all queries sent to Perplexity cloud."></div>
-              <div class="installer-card" data-id="genspark" data-name="Genspark" data-desc="AI super-agent search platform — queries sent to Genspark AI cloud."></div>
-            </div>
+            <div id="installers-browsers-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3"></div>
           </div>
 
-          <!-- Productivity Tools -->
           <div class="mb-8">
             <div class="flex items-center justify-between mb-3">
-              <h3 class="font-semibold text-gray-300">AI Productivity &amp; Coding Tools <span class="text-xs text-amber-400 ml-2">Data Leakers</span></h3>
-              <button onclick="apiPost('/api/installers/group/productivity')"
-                class="card-btn text-xs bg-gray-800 hover:bg-gray-700 border border-gray-700 px-3 py-1.5 rounded-lg">
-                Install All (8)
-              </button>
+              <h3 class="font-semibold text-gray-300">AI Productivity &amp; Coding Tools</h3>
+              <button onclick="apiPost('/api/installers/group/productivity')" class="card-btn text-xs bg-gray-800 hover:bg-gray-700 border border-gray-700 px-3 py-1.5 rounded-lg">Install All</button>
             </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-              <div class="installer-card" data-id="cursor" data-name="Cursor IDE" data-desc="AI-first code editor — sends code context to OpenAI/Anthropic."></div>
-              <div class="installer-card" data-id="windsurf" data-name="Windsurf (Codeium)" data-desc="Agentic AI IDE — auto-completes and sends code to cloud."></div>
-              <div class="installer-card" data-id="notion" data-name="Notion AI" data-desc="Note-taking with AI — document contents sent to OpenAI."></div>
-              <div class="installer-card" data-id="gh_copilot" data-name="GitHub Copilot CLI" data-desc="AI coding assistant — sends shell commands &amp; code to GitHub AI."></div>
-              <div class="installer-card" data-id="zed" data-name="Zed Editor (AI)" data-desc="Collaborative AI code editor — sends code context to Anthropic/OpenAI."></div>
-              <div class="installer-card" data-id="trae" data-name="Trae IDE (ByteDance)" data-desc="AI-native IDE by ByteDance — code sent to ByteDance AI cloud."></div>
-              <div class="installer-card" data-id="augment" data-name="Augment Code" data-desc="AI coding assistant with repo awareness — codebase sent to Augment cloud."></div>
-              <div class="installer-card" data-id="codeium_ext" data-name="Codeium Desktop" data-desc="AI code completion — code snippets and context sent to Codeium cloud."></div>
-            </div>
+            <div id="installers-productivity-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3"></div>
           </div>
         </div>
 
