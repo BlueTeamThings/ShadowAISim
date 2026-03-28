@@ -147,9 +147,80 @@ def _make_row(e: dict) -> str:
 
 
 def _summarise(history: list[dict]) -> dict:
-    counts = Counter(e.get("level") for e in history)
+    counts  = Counter(e.get("level") for e in history)
     targets = list({e["target"] for e in history if e.get("target")})
     types   = list({e["data_type"] for e in history if e.get("data_type")})
+
+    # Web leakage breakdown
+    web = {
+        "reachable":       sum(1 for e in history
+                               if e.get("category") == "CHECK"
+                               and e.get("level") == "SUCCESS"
+                               and "USABLE" in e.get("message", "")),
+        "blocked":         sum(1 for e in history
+                               if e.get("category") in ("BROWSER", "CHECK", "BROWSE")
+                               and e.get("level") == "BLOCKED"),
+        "inputs_found":    sum(1 for e in history
+                               if e.get("category") == "CHECK"
+                               and "input field found" in e.get("message", "")),
+        "leaks_simulated": sum(1 for e in history
+                               if e.get("category") == "BROWSER"
+                               and e.get("level") == "ALERT"
+                               and "DATA LEAK SIMULATED" in e.get("message", "")),
+    }
+
+    # Installer breakdown
+    installers = {
+        "downloaded": sum(1 for e in history
+                          if e.get("category") == "INSTALLER"
+                          and "Download complete" in e.get("message", "")),
+        "installed":  sum(1 for e in history
+                          if e.get("category") == "INSTALLER"
+                          and e.get("level") == "ALERT"
+                          and "INSTALLED:" in e.get("message", "")),
+        "blocked":    sum(1 for e in history
+                          if e.get("category") == "INSTALLER"
+                          and e.get("level") == "BLOCKED"),
+        "failed":     sum(1 for e in history
+                          if e.get("category") == "INSTALLER"
+                          and e.get("level") == "ERROR"
+                          and "INSTALL FAILED" in e.get("message", "")),
+    }
+
+    # API probe breakdown
+    probes = {
+        "sent":              sum(1 for e in history
+                                 if e.get("category") == "API_PROBE"
+                                 and e.get("level") == "INFO"
+                                 and "Sending POST" in e.get("message", "")),
+        "traffic_generated": sum(1 for e in history
+                                 if e.get("category") == "API_PROBE"
+                                 and e.get("level") == "ALERT"
+                                 and "TRAFFIC GENERATED" in e.get("message", "")),
+        "blocked":           sum(1 for e in history
+                                 if e.get("category") == "API_PROBE"
+                                 and e.get("level") == "BLOCKED"),
+    }
+
+    # MCP breakdown
+    mcp = {
+        "installs_attempted": sum(1 for e in history
+                                  if e.get("category") == "MCP"
+                                  and e.get("level") == "INFO"
+                                  and "Installing MCP server:" in e.get("message", "")),
+        "installs_succeeded": sum(1 for e in history
+                                  if e.get("category") == "MCP"
+                                  and e.get("level") == "ALERT"
+                                  and "MCP SERVER INSTALLED" in e.get("message", "")),
+        "configs_injected":   sum(1 for e in history
+                                  if e.get("category") == "MCP"
+                                  and e.get("level") == "ALERT"
+                                  and "CONFIG INJECTED" in e.get("message", "")),
+        "blocked":            sum(1 for e in history
+                                  if e.get("category") == "MCP"
+                                  and e.get("level") == "BLOCKED"),
+    }
+
     return {
         "alerts":       counts.get("ALERT",   0),
         "blocked":      counts.get("BLOCKED", 0),
@@ -158,4 +229,8 @@ def _summarise(history: list[dict]) -> dict:
         "warnings":     counts.get("WARN",    0),
         "targets_hit":  targets,
         "data_types":   types,
+        "web":          web,
+        "installers":   installers,
+        "probes":       probes,
+        "mcp":          mcp,
     }

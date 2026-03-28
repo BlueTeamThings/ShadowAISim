@@ -40,13 +40,20 @@ async def download_html():
 
 @router.get("/api/reports/summary")
 async def summary():
-    from collections import Counter
+    from app.core.report_generator import _summarise
     if not bus.history:
-        return {"events": 0}
-    counts = Counter(e.get("level") for e in bus.history)
+        return {"events": 0, "alerts": 0, "blocked": 0, "errors": 0,
+                "web": {"reachable": 0, "blocked": 0, "leaks_simulated": 0, "inputs_found": 0},
+                "installers": {"downloaded": 0, "installed": 0, "blocked": 0, "failed": 0},
+                "probes": {"sent": 0, "traffic_generated": 0, "blocked": 0}}
+    s = _summarise(bus.history)
     return {
-        "events":  len(bus.history),
-        "alerts":  counts.get("ALERT",   0),
-        "blocked": counts.get("BLOCKED", 0),
-        "errors":  counts.get("ERROR",   0),
+        "events":     len(bus.history),
+        "alerts":     s["alerts"],
+        "blocked":    s["blocked"],
+        "errors":     s["errors"],
+        "web":        s["web"],
+        "installers": s["installers"],
+        "probes":     s["probes"],
+        "mcp":        s["mcp"],
     }

@@ -103,7 +103,7 @@ BROWSER_TARGETS = [
         "name":      "Google Gemini",
         "url":       "https://gemini.google.com",
         "payload":   PAYLOAD_FINANCIAL,
-        "data_type": "MNPI / Financial Projections",
+        "data_type": "Financial MNPI",
     },
     {
         "id":        "perplexity",
@@ -156,12 +156,6 @@ API_TARGETS = [
 
 # ─────────────────────────────────────────────────────────────────────────────
 # AI APPLICATION INSTALLER DEFINITIONS
-#
-# Each entry has:
-#   urls  — download URL per platform (None = not available)
-#   fmt   — explicit package format hint so the installer knows how to run it
-#           formats: sh | appimage | deb | rpm | run | tar.gz | tar.bz2
-#                    dmg | pkg | zip | exe | msi
 # ─────────────────────────────────────────────────────────────────────────────
 
 INSTALLERS_LOCAL_AI = [

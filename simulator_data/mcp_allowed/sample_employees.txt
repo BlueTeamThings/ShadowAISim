@@ -1,0 +1,3 @@
+SIMULATED CORPORATE DATA — FOR TESTING ONLY
+Employee: John Doe, Dept: Engineering, ID: E-00142
+Employee: Jane Smith, Dept: Finance, ID: E-00891
