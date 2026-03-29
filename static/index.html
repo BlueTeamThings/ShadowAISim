@@ -60,12 +60,20 @@
         🔌 API Probe
       </button>
       <button class="nav-item text-left px-5 py-2.5 text-sm font-medium rounded-lg mx-2 mb-0.5"
+              data-section="mcp-servers" onclick="showSection('mcp-servers')">
+        🔗 MCP Servers
+      </button>
+      <button class="nav-item text-left px-5 py-2.5 text-sm font-medium rounded-lg mx-2 mb-0.5"
               data-section="audit" onclick="showSection('audit')">
         🚀 Full Audit
       </button>
       <button class="nav-item text-left px-5 py-2.5 text-sm font-medium rounded-lg mx-2 mb-0.5"
               data-section="reports" onclick="showSection('reports')">
         📄 Reports
+      </button>
+      <button class="nav-item text-left px-5 py-2.5 text-sm font-medium rounded-lg mx-2 mb-0.5"
+              data-section="preflight" onclick="showSection('preflight'); runPreflight()">
+        🔧 Dep Health
       </button>
     </nav>
 
@@ -94,7 +102,11 @@
               <div class="text-xs text-gray-500 mt-1">API Probe Endpoints</div>
             </div>
             <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 text-center">
-              <div class="text-3xl font-bold text-green-400">3</div>
+              <div class="text-3xl font-bold text-purple-400">5</div>
+              <div class="text-xs text-gray-500 mt-1">MCP Server Types</div>
+            </div>
+            <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 text-center">
+              <div class="text-3xl font-bold text-green-400">4</div>
               <div class="text-xs text-gray-500 mt-1">Audit Phases</div>
             </div>
           </div>
@@ -141,71 +153,40 @@
         <!-- ═══════════════════════════════ INSTALLERS ══════════════════════ -->
         <div id="section-installers" class="section">
           <h2 class="text-xl font-bold mb-1">AI App Installers</h2>
-          <p class="text-gray-400 text-sm mb-6">Downloads and silently installs each AI application on this system. On Linux: AppImages land in <code class="bg-gray-800 px-1 rounded">~/.local/bin</code>, .deb packages via apt/dpkg. On macOS: .app bundles copied to <code class="bg-gray-800 px-1 rounded">/Applications</code>. On Windows: silent /S or /VERYSILENT flags used.</p>
+          <p class="text-gray-400 text-sm mb-4">Install, validate, and launch test apps from one place. Start is enabled when an app is installed or has a launch strategy.</p>
 
-          <!-- Local AI Models -->
+          <div class="flex flex-wrap gap-2 mb-6">
+            <button onclick="setInstallerFilter('all')" class="card-btn text-xs bg-gray-800 hover:bg-gray-700 border border-gray-700 px-3 py-1.5 rounded-lg">All</button>
+            <button onclick="setInstallerFilter('installed')" class="card-btn text-xs bg-gray-800 hover:bg-gray-700 border border-gray-700 px-3 py-1.5 rounded-lg">Installed</button>
+            <button onclick="setInstallerFilter('installable')" class="card-btn text-xs bg-gray-800 hover:bg-gray-700 border border-gray-700 px-3 py-1.5 rounded-lg">Installable on This OS</button>
+            <button onclick="setInstallerFilter('unsupported')" class="card-btn text-xs bg-gray-800 hover:bg-gray-700 border border-gray-700 px-3 py-1.5 rounded-lg">Unsupported on This OS</button>
+            <button onclick="setInstallerFilter('failed-url')" class="card-btn text-xs bg-gray-800 hover:bg-gray-700 border border-gray-700 px-3 py-1.5 rounded-lg">Failed URL Resolution</button>
+            <button onclick="setInstallerFilter('running')" class="card-btn text-xs bg-gray-800 hover:bg-gray-700 border border-gray-700 px-3 py-1.5 rounded-lg">Running</button>
+            <button onclick="refreshInstallers()" class="card-btn text-xs bg-indigo-900 hover:bg-indigo-800 border border-indigo-700 px-3 py-1.5 rounded-lg text-indigo-200">Refresh</button>
+          </div>
+
           <div class="mb-8">
             <div class="flex items-center justify-between mb-3">
               <h3 class="font-semibold text-gray-300">Local AI Models &amp; Desktop Apps</h3>
-              <button onclick="apiPost('/api/installers/group/local-ai')"
-                class="card-btn text-xs bg-gray-800 hover:bg-gray-700 border border-gray-700 px-3 py-1.5 rounded-lg">
-                Install All (11)
-              </button>
+              <button onclick="apiPost('/api/installers/group/local_ai')" class="card-btn text-xs bg-gray-800 hover:bg-gray-700 border border-gray-700 px-3 py-1.5 rounded-lg">Install All</button>
             </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-              <div class="installer-card" data-id="ollama" data-name="Ollama" data-desc="Local LLM runner for Llama, Mistral, Gemma and more."></div>
-              <div class="installer-card" data-id="lmstudio" data-name="LM Studio" data-desc="GUI desktop app for running local AI models."></div>
-              <div class="installer-card" data-id="gpt4all" data-name="GPT4All" data-desc="Privacy-first local AI chat application."></div>
-              <div class="installer-card" data-id="jan" data-name="Jan AI" data-desc="Open-source local ChatGPT alternative."></div>
-              <div class="installer-card" data-id="chatgpt_desktop" data-name="ChatGPT Desktop" data-desc="Official OpenAI desktop app — all conversations sent to OpenAI cloud."></div>
-              <div class="installer-card" data-id="claude_desktop" data-name="Claude Desktop" data-desc="Official Anthropic desktop application."></div>
-              <div class="installer-card" data-id="anythingllm" data-name="AnythingLLM" data-desc="All-in-one RAG/agent desktop app — docs sent to configured AI provider."></div>
-              <div class="installer-card" data-id="msty" data-name="Msty" data-desc="Universal AI desktop client — connects to OpenAI, Anthropic, Groq, local models."></div>
-              <div class="installer-card" data-id="poe" data-name="Poe (Quora)" data-desc="Multi-model AI chat aggregator — all chats routed through Poe cloud."></div>
-              <div class="installer-card" data-id="copilot_app" data-name="Microsoft Copilot" data-desc="Microsoft standalone AI assistant — queries sent to Azure OpenAI cloud."></div>
-              <div class="installer-card" data-id="open_webui" data-name="Open WebUI" data-desc="Self-hosted AI frontend bridging local Ollama and cloud LLM APIs."></div>
-            </div>
+            <div id="installers-local-ai-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3"></div>
           </div>
 
-          <!-- AI Browsers -->
           <div class="mb-8">
             <div class="flex items-center justify-between mb-3">
-              <h3 class="font-semibold text-gray-300">AI-Integrated Browsers <span class="text-xs text-red-400 ml-2">High Data Risk</span></h3>
-              <button onclick="apiPost('/api/installers/group/browsers')"
-                class="card-btn text-xs bg-gray-800 hover:bg-gray-700 border border-gray-700 px-3 py-1.5 rounded-lg">
-                Install All (7)
-              </button>
+              <h3 class="font-semibold text-gray-300">AI-Integrated Browsers</h3>
+              <button onclick="apiPost('/api/installers/group/browsers')" class="card-btn text-xs bg-gray-800 hover:bg-gray-700 border border-gray-700 px-3 py-1.5 rounded-lg">Install All</button>
             </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-              <div class="installer-card" data-id="arc" data-name="Arc Browser (Arc Max)" data-desc="AI-first browser — browsing context sent to AI summarizers."></div>
-              <div class="installer-card" data-id="opera" data-name="Opera One" data-desc="Built-in AI assistant (Aria) — high data exfiltration risk."></div>
-              <div class="installer-card" data-id="dia" data-name="Dia Browser" data-desc="AI-native browser by The Browser Company — all tabs sent to AI cloud."></div>
-              <div class="installer-card" data-id="brave" data-name="Brave Browser (Leo AI)" data-desc="Privacy browser with Leo AI — queries sent to Anthropic/Meta cloud."></div>
-              <div class="installer-card" data-id="edge_copilot" data-name="Microsoft Edge (Copilot)" data-desc="Copilot AI sidebar — browsing context sent to Microsoft Azure."></div>
-              <div class="installer-card" data-id="perplexity_app" data-name="Perplexity Desktop" data-desc="AI search/answer engine — all queries sent to Perplexity cloud."></div>
-              <div class="installer-card" data-id="genspark" data-name="Genspark" data-desc="AI super-agent search platform — queries sent to Genspark AI cloud."></div>
-            </div>
+            <div id="installers-browsers-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3"></div>
           </div>
 
-          <!-- Productivity Tools -->
           <div class="mb-8">
             <div class="flex items-center justify-between mb-3">
-              <h3 class="font-semibold text-gray-300">AI Productivity &amp; Coding Tools <span class="text-xs text-amber-400 ml-2">Data Leakers</span></h3>
-              <button onclick="apiPost('/api/installers/group/productivity')"
-                class="card-btn text-xs bg-gray-800 hover:bg-gray-700 border border-gray-700 px-3 py-1.5 rounded-lg">
-                Install All (8)
-              </button>
+              <h3 class="font-semibold text-gray-300">AI Productivity &amp; Coding Tools</h3>
+              <button onclick="apiPost('/api/installers/group/productivity')" class="card-btn text-xs bg-gray-800 hover:bg-gray-700 border border-gray-700 px-3 py-1.5 rounded-lg">Install All</button>
             </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-              <div class="installer-card" data-id="cursor" data-name="Cursor IDE" data-desc="AI-first code editor — sends code context to OpenAI/Anthropic."></div>
-              <div class="installer-card" data-id="windsurf" data-name="Windsurf (Codeium)" data-desc="Agentic AI IDE — auto-completes and sends code to cloud."></div>
-              <div class="installer-card" data-id="notion" data-name="Notion AI" data-desc="Note-taking with AI — document contents sent to OpenAI."></div>
-              <div class="installer-card" data-id="gh_copilot" data-name="GitHub Copilot CLI" data-desc="AI coding assistant — sends shell commands &amp; code to GitHub AI."></div>
-              <div class="installer-card" data-id="zed" data-name="Zed Editor (AI)" data-desc="Collaborative AI code editor — sends code context to Anthropic/OpenAI."></div>
-              <div class="installer-card" data-id="trae" data-name="Trae IDE (ByteDance)" data-desc="AI-native IDE by ByteDance — code sent to ByteDance AI cloud."></div>
-              <div class="installer-card" data-id="augment" data-name="Augment Code" data-desc="AI coding assistant with repo awareness — codebase sent to Augment cloud."></div>
-              <div class="installer-card" data-id="codeium_ext" data-name="Codeium Desktop" data-desc="AI code completion — code snippets and context sent to Codeium cloud."></div>
-            </div>
+            <div id="installers-productivity-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3"></div>
           </div>
         </div>
 
@@ -424,6 +405,210 @@
           </div>
         </div>
 
+        <!-- ══════════════════════════════ MCP SERVERS ══════════════════════ -->
+        <div id="section-mcp-servers" class="section">
+          <h2 class="text-xl font-bold mb-1">MCP Server Installations</h2>
+          <p class="text-gray-400 text-sm mb-2">
+            Simulates an employee connecting their local AI desktop client (Claude Desktop) to sensitive corporate data sources
+            via Model Context Protocol servers. Runs real <code class="bg-gray-800 px-1 rounded">npx</code> /
+            <code class="bg-gray-800 px-1 rounded">pip install</code> commands to generate EDR process-creation
+            and network-download telemetry, then injects entries into the AI client's config file to trigger FIM alerts.
+          </p>
+          <div class="bg-red-950 border border-red-800 rounded-xl p-3 mb-6 text-xs text-red-300">
+            <strong>Detection Targets:</strong>
+            EDR (npx/pip subprocess creation + npm registry downloads) &bull;
+            FIM (claude_desktop_config.json modification) &bull;
+            SIEM (unauthorized AI client reconfiguration)
+          </div>
+
+          <!-- Action bar -->
+          <div class="flex gap-3 mb-6 flex-wrap">
+            <button onclick="apiPost('/api/mcp/simulate/all')"
+              class="bg-red-700 hover:bg-red-600 text-white font-semibold px-5 py-2.5 rounded-lg text-sm">
+              Simulate All (Install + Inject Config)
+            </button>
+            <button onclick="apiPost('/api/mcp/install/all')"
+              class="bg-orange-800 hover:bg-orange-700 border border-orange-700 text-white font-semibold px-5 py-2.5 rounded-lg text-sm">
+              Install Packages Only
+            </button>
+            <button onclick="apiPost('/api/mcp/inject/all')"
+              class="bg-purple-800 hover:bg-purple-700 border border-purple-700 text-white font-semibold px-5 py-2.5 rounded-lg text-sm">
+              Inject Config Only (FIM)
+            </button>
+            <button onclick="apiPost('/api/mcp/restore')"
+              title="Restore the original claude_desktop_config.json from backup"
+              class="bg-gray-700 hover:bg-gray-600 border border-gray-600 text-white font-semibold px-5 py-2.5 rounded-lg text-sm">
+              Restore Config
+            </button>
+          </div>
+
+          <!-- MCP server cards -->
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8" id="mcp-cards">
+
+            <!-- Filesystem -->
+            <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
+              <div class="flex justify-between items-start mb-3">
+                <div>
+                  <p class="font-semibold">Local File System</p>
+                  <p class="text-xs text-gray-500 mt-0.5">@modelcontextprotocol/server-filesystem</p>
+                </div>
+                <span class="text-xs bg-red-900 text-red-300 px-2 py-0.5 rounded-full shrink-0">CRITICAL</span>
+              </div>
+              <p class="text-xs text-gray-400 mb-1">Grants AI direct read/write access to the entire user home directory. Enables silent file exfiltration.</p>
+              <p class="text-xs text-gray-600 font-mono mb-3">npx -y @modelcontextprotocol/server-filesystem ~/</p>
+              <div class="flex gap-2">
+                <button onclick="apiPost('/api/mcp/simulate/filesystem')"
+                  class="card-btn flex-1 bg-gray-800 hover:bg-red-900 border border-gray-700 hover:border-red-800 text-sm py-2 rounded-lg">
+                  Simulate (Install + Inject)
+                </button>
+                <button onclick="apiPost('/api/mcp/install/filesystem')"
+                  class="card-btn bg-orange-900 hover:bg-orange-800 border border-orange-800 text-xs px-3 py-2 rounded-lg text-orange-300">
+                  Install
+                </button>
+                <button onclick="apiPost('/api/mcp/inject/filesystem')"
+                  class="card-btn bg-purple-900 hover:bg-purple-800 border border-purple-800 text-xs px-3 py-2 rounded-lg text-purple-300">
+                  Inject
+                </button>
+              </div>
+            </div>
+
+            <!-- PostgreSQL -->
+            <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
+              <div class="flex justify-between items-start mb-3">
+                <div>
+                  <p class="font-semibold">PostgreSQL Database</p>
+                  <p class="text-xs text-gray-500 mt-0.5">@modelcontextprotocol/server-postgres</p>
+                </div>
+                <span class="text-xs bg-red-900 text-red-300 px-2 py-0.5 rounded-full shrink-0">CRITICAL</span>
+              </div>
+              <p class="text-xs text-gray-400 mb-1">Gives AI direct SQL query access to corporate PostgreSQL databases, bypassing application-layer controls.</p>
+              <p class="text-xs text-gray-600 font-mono mb-3">npx -y @modelcontextprotocol/server-postgres postgresql://admin:…@db-prod.acme-internal.com/corporate_db</p>
+              <div class="flex gap-2">
+                <button onclick="apiPost('/api/mcp/simulate/postgres')"
+                  class="card-btn flex-1 bg-gray-800 hover:bg-red-900 border border-gray-700 hover:border-red-800 text-sm py-2 rounded-lg">
+                  Simulate (Install + Inject)
+                </button>
+                <button onclick="apiPost('/api/mcp/install/postgres')"
+                  class="card-btn bg-orange-900 hover:bg-orange-800 border border-orange-800 text-xs px-3 py-2 rounded-lg text-orange-300">
+                  Install
+                </button>
+                <button onclick="apiPost('/api/mcp/inject/postgres')"
+                  class="card-btn bg-purple-900 hover:bg-purple-800 border border-purple-800 text-xs px-3 py-2 rounded-lg text-purple-300">
+                  Inject
+                </button>
+              </div>
+            </div>
+
+            <!-- GitHub -->
+            <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
+              <div class="flex justify-between items-start mb-3">
+                <div>
+                  <p class="font-semibold">GitHub</p>
+                  <p class="text-xs text-gray-500 mt-0.5">@modelcontextprotocol/server-github</p>
+                </div>
+                <span class="text-xs bg-orange-900 text-orange-300 px-2 py-0.5 rounded-full shrink-0">HIGH</span>
+              </div>
+              <p class="text-xs text-gray-400 mb-1">Connects AI to GitHub repos, issues, PRs, and organisation secrets. Allows reading of private source code.</p>
+              <p class="text-xs text-gray-600 font-mono mb-3">npx -y @modelcontextprotocol/server-github  (GITHUB_PERSONAL_ACCESS_TOKEN injected)</p>
+              <div class="flex gap-2">
+                <button onclick="apiPost('/api/mcp/simulate/github')"
+                  class="card-btn flex-1 bg-gray-800 hover:bg-red-900 border border-gray-700 hover:border-red-800 text-sm py-2 rounded-lg">
+                  Simulate (Install + Inject)
+                </button>
+                <button onclick="apiPost('/api/mcp/install/github')"
+                  class="card-btn bg-orange-900 hover:bg-orange-800 border border-orange-800 text-xs px-3 py-2 rounded-lg text-orange-300">
+                  Install
+                </button>
+                <button onclick="apiPost('/api/mcp/inject/github')"
+                  class="card-btn bg-purple-900 hover:bg-purple-800 border border-purple-800 text-xs px-3 py-2 rounded-lg text-purple-300">
+                  Inject
+                </button>
+              </div>
+            </div>
+
+            <!-- Google Drive -->
+            <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
+              <div class="flex justify-between items-start mb-3">
+                <div>
+                  <p class="font-semibold">Google Drive</p>
+                  <p class="text-xs text-gray-500 mt-0.5">@modelcontextprotocol/server-gdrive</p>
+                </div>
+                <span class="text-xs bg-orange-900 text-orange-300 px-2 py-0.5 rounded-full shrink-0">HIGH</span>
+              </div>
+              <p class="text-xs text-gray-400 mb-1">Connects AI to corporate Google Drive. AI can silently read, search, and exfiltrate documents and spreadsheets.</p>
+              <p class="text-xs text-gray-600 font-mono mb-3">npx -y @modelcontextprotocol/server-gdrive</p>
+              <div class="flex gap-2">
+                <button onclick="apiPost('/api/mcp/simulate/gdrive')"
+                  class="card-btn flex-1 bg-gray-800 hover:bg-red-900 border border-gray-700 hover:border-red-800 text-sm py-2 rounded-lg">
+                  Simulate (Install + Inject)
+                </button>
+                <button onclick="apiPost('/api/mcp/install/gdrive')"
+                  class="card-btn bg-orange-900 hover:bg-orange-800 border border-orange-800 text-xs px-3 py-2 rounded-lg text-orange-300">
+                  Install
+                </button>
+                <button onclick="apiPost('/api/mcp/inject/gdrive')"
+                  class="card-btn bg-purple-900 hover:bg-purple-800 border border-purple-800 text-xs px-3 py-2 rounded-lg text-purple-300">
+                  Inject
+                </button>
+              </div>
+            </div>
+
+            <!-- SQLite (pip) -->
+            <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 lg:col-span-2">
+              <div class="flex justify-between items-start mb-3">
+                <div>
+                  <p class="font-semibold">SQLite (pip install)</p>
+                  <p class="text-xs text-gray-500 mt-0.5">mcp-server-sqlite  via pip</p>
+                </div>
+                <span class="text-xs bg-yellow-900 text-yellow-300 px-2 py-0.5 rounded-full shrink-0">MEDIUM</span>
+              </div>
+              <p class="text-xs text-gray-400 mb-1">Demonstrates the Python/pip install vector for MCP servers. Installs a local SQLite server that gives AI access to local database files.</p>
+              <p class="text-xs text-gray-600 font-mono mb-3">pip install mcp-server-sqlite</p>
+              <div class="flex gap-2 max-w-lg">
+                <button onclick="apiPost('/api/mcp/simulate/sqlite')"
+                  class="card-btn flex-1 bg-gray-800 hover:bg-red-900 border border-gray-700 hover:border-red-800 text-sm py-2 rounded-lg">
+                  Simulate (Install + Inject)
+                </button>
+                <button onclick="apiPost('/api/mcp/install/sqlite')"
+                  class="card-btn bg-orange-900 hover:bg-orange-800 border border-orange-800 text-xs px-3 py-2 rounded-lg text-orange-300">
+                  Install
+                </button>
+                <button onclick="apiPost('/api/mcp/inject/sqlite')"
+                  class="card-btn bg-purple-900 hover:bg-purple-800 border border-purple-800 text-xs px-3 py-2 rounded-lg text-purple-300">
+                  Inject
+                </button>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- How it works -->
+          <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
+            <h3 class="font-semibold mb-3 text-gray-300">How MCP Detection Works</h3>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-gray-400">
+              <div>
+                <p class="text-orange-400 font-semibold mb-1">1. Package Install (EDR)</p>
+                <p>Running <code class="bg-gray-800 px-1 rounded">npx -y @modelcontextprotocol/...</code> creates a new process and downloads from the npm registry. EDR should alert on unknown processes spawning from AI desktop clients.</p>
+              </div>
+              <div>
+                <p class="text-purple-400 font-semibold mb-1">2. Config Injection (FIM)</p>
+                <p>Modifying <code class="bg-gray-800 px-1 rounded">claude_desktop_config.json</code> should trigger your File Integrity Monitoring solution. This is the primary detection vector — monitor AI client config files.</p>
+              </div>
+              <div>
+                <p class="text-red-400 font-semibold mb-1">3. Runtime Access (SIEM)</p>
+                <p>On next Claude Desktop launch, the injected MCP servers auto-start. A filesystem or database MCP server then gives the AI silent access to corporate data with no further user interaction.</p>
+              </div>
+            </div>
+            <div class="mt-4 p-3 bg-gray-800 rounded-lg text-xs text-gray-400">
+              <strong class="text-gray-300">Config file paths monitored:</strong><br>
+              Windows: <code class="text-indigo-400">%APPDATA%\Claude\claude_desktop_config.json</code><br>
+              macOS: <code class="text-indigo-400">~/Library/Application Support/Claude/claude_desktop_config.json</code><br>
+              Linux (unofficial): <code class="text-indigo-400">~/.config/Claude/claude_desktop_config.json</code>
+              <br><span class="text-yellow-500 mt-1 block">If Claude Desktop is not installed, a dummy config is created in a temp directory to simulate the FIM modification step.</span>
+            </div>
+          </div>
+        </div>
+
         <!-- ═══════════════════════════════ FULL AUDIT ══════════════════════ -->
         <div id="section-audit" class="section">
           <h2 class="text-xl font-bold mb-1">Full Shadow AI Audit</h2>
@@ -431,7 +616,7 @@
             Runs all three phases sequentially. Every action is timestamped so your security team can cross-reference against SIEM/DLP alerts to find gaps.
           </p>
 
-          <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-8">
+          <div class="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-8">
             <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
               <div class="text-2xl mb-2">🌐</div>
               <p class="font-semibold mb-1">Phase 1 — Web Leakage</p>
@@ -446,6 +631,11 @@
               <div class="text-2xl mb-2">📦</div>
               <p class="font-semibold mb-1">Phase 3 — Installer Downloads</p>
               <p class="text-xs text-gray-400">Downloads and silently installs all 26 AI tools on this system to test EDR/DLP response to actual app installations.</p>
+            </div>
+            <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
+              <div class="text-2xl mb-2">🔗</div>
+              <p class="font-semibold mb-1">Phase 4 — MCP Servers</p>
+              <p class="text-xs text-gray-400">Installs 5 MCP server packages via npx/pip and injects them into the Claude Desktop config to trigger FIM alerts.</p>
             </div>
           </div>
 
@@ -501,15 +691,186 @@
             </div>
           </div>
 
-          <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
-            <h3 class="font-semibold mb-3">Current Session Summary</h3>
-            <div id="report-summary" class="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div class="text-center"><div id="s-events" class="text-2xl font-bold text-gray-300">0</div><div class="text-xs text-gray-500">Events</div></div>
+          <!-- Overview row -->
+          <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-6">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="font-semibold">Session Overview</h3>
+              <button onclick="refreshSummary()" class="text-xs text-gray-500 hover:text-gray-300 border border-gray-700 px-3 py-1 rounded-lg">↻ Refresh</button>
+            </div>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div class="text-center"><div id="s-events" class="text-2xl font-bold text-gray-300">0</div><div class="text-xs text-gray-500">Total Events</div></div>
               <div class="text-center"><div id="s-alerts" class="text-2xl font-bold text-red-400">0</div><div class="text-xs text-gray-500">Leak Alerts</div></div>
               <div class="text-center"><div id="s-blocked" class="text-2xl font-bold text-yellow-400">0</div><div class="text-xs text-gray-500">Blocked</div></div>
               <div class="text-center"><div id="s-errors" class="text-2xl font-bold text-gray-500">0</div><div class="text-xs text-gray-500">Errors</div></div>
             </div>
-            <button onclick="refreshSummary()" class="mt-4 text-xs text-gray-500 hover:text-gray-300">↻ Refresh</button>
+          </div>
+
+          <!-- Detailed category breakdowns -->
+          <div class="grid grid-cols-1 lg:grid-cols-4 gap-5 mb-6">
+
+            <!-- Web Leakage Summary -->
+            <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
+              <div class="flex items-center gap-2 mb-4">
+                <div class="w-8 h-8 rounded-lg bg-red-900/50 border border-red-800 flex items-center justify-center text-sm">🌐</div>
+                <div>
+                  <h4 class="font-semibold text-sm">Web Data Leakage</h4>
+                  <p class="text-xs text-gray-500">Browser simulation results</p>
+                </div>
+              </div>
+              <div class="space-y-3">
+                <div class="flex items-center justify-between">
+                  <span class="text-sm text-gray-400">Sites reachable</span>
+                  <span id="s-web-reachable" class="text-lg font-bold text-green-400">0</span>
+                </div>
+                <div class="flex items-center justify-between">
+                  <span class="text-sm text-gray-400">Sites blocked</span>
+                  <span id="s-web-blocked" class="text-lg font-bold text-yellow-400">0</span>
+                </div>
+                <div class="flex items-center justify-between">
+                  <span class="text-sm text-gray-400">Input fields found</span>
+                  <span id="s-web-inputs" class="text-lg font-bold text-amber-400">0</span>
+                </div>
+                <div class="flex items-center justify-between border-t border-gray-800 pt-2">
+                  <span class="text-sm text-gray-300 font-medium">Data leaks simulated</span>
+                  <span id="s-web-leaks" class="text-lg font-bold text-red-400">0</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Installer Summary -->
+            <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
+              <div class="flex items-center gap-2 mb-4">
+                <div class="w-8 h-8 rounded-lg bg-indigo-900/50 border border-indigo-800 flex items-center justify-center text-sm">📦</div>
+                <div>
+                  <h4 class="font-semibold text-sm">AI App Installers</h4>
+                  <p class="text-xs text-gray-500">Download & install results</p>
+                </div>
+              </div>
+              <div class="space-y-3">
+                <div class="flex items-center justify-between">
+                  <span class="text-sm text-gray-400">Downloads completed</span>
+                  <span id="s-inst-downloaded" class="text-lg font-bold text-blue-400">0</span>
+                </div>
+                <div class="flex items-center justify-between">
+                  <span class="text-sm text-gray-400">Blocked by policy</span>
+                  <span id="s-inst-blocked" class="text-lg font-bold text-yellow-400">0</span>
+                </div>
+                <div class="flex items-center justify-between">
+                  <span class="text-sm text-gray-400">Install failed</span>
+                  <span id="s-inst-failed" class="text-lg font-bold text-gray-500">0</span>
+                </div>
+                <div class="flex items-center justify-between border-t border-gray-800 pt-2">
+                  <span class="text-sm text-gray-300 font-medium">Apps installed</span>
+                  <span id="s-inst-installed" class="text-lg font-bold text-red-400">0</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- API Probe Summary -->
+            <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
+              <div class="flex items-center gap-2 mb-4">
+                <div class="w-8 h-8 rounded-lg bg-amber-900/50 border border-amber-800 flex items-center justify-center text-sm">🔌</div>
+                <div>
+                  <h4 class="font-semibold text-sm">API Endpoint Probes</h4>
+                  <p class="text-xs text-gray-500">Direct API test results</p>
+                </div>
+              </div>
+              <div class="space-y-3">
+                <div class="flex items-center justify-between">
+                  <span class="text-sm text-gray-400">Probes sent</span>
+                  <span id="s-probe-sent" class="text-lg font-bold text-blue-400">0</span>
+                </div>
+                <div class="flex items-center justify-between">
+                  <span class="text-sm text-gray-400">Blocked by proxy</span>
+                  <span id="s-probe-blocked" class="text-lg font-bold text-yellow-400">0</span>
+                </div>
+                <div class="flex items-center justify-between border-t border-gray-800 pt-2">
+                  <span class="text-sm text-gray-300 font-medium">Traffic generated</span>
+                  <span id="s-probe-traffic" class="text-lg font-bold text-red-400">0</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- MCP Server Summary -->
+            <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
+              <div class="flex items-center gap-2 mb-4">
+                <div class="w-8 h-8 rounded-lg bg-purple-900/50 border border-purple-800 flex items-center justify-center text-sm">🔗</div>
+                <div>
+                  <h4 class="font-semibold text-sm">MCP Server Installs</h4>
+                  <p class="text-xs text-gray-500">EDR + FIM detection results</p>
+                </div>
+              </div>
+              <div class="space-y-3">
+                <div class="flex items-center justify-between">
+                  <span class="text-sm text-gray-400">Installs attempted</span>
+                  <span id="s-mcp-attempted" class="text-lg font-bold text-blue-400">0</span>
+                </div>
+                <div class="flex items-center justify-between">
+                  <span class="text-sm text-gray-400">Packages installed</span>
+                  <span id="s-mcp-installed" class="text-lg font-bold text-orange-400">0</span>
+                </div>
+                <div class="flex items-center justify-between">
+                  <span class="text-sm text-gray-400">Blocked</span>
+                  <span id="s-mcp-blocked" class="text-lg font-bold text-yellow-400">0</span>
+                </div>
+                <div class="flex items-center justify-between border-t border-gray-800 pt-2">
+                  <span class="text-sm text-gray-300 font-medium">Configs injected (FIM)</span>
+                  <span id="s-mcp-injected" class="text-lg font-bold text-red-400">0</span>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Verdict banner -->
+          <div id="summary-verdict" class="hidden bg-gray-900 border border-gray-800 rounded-xl p-5">
+            <h3 class="font-semibold mb-2">Assessment</h3>
+            <p id="verdict-text" class="text-sm text-gray-400"></p>
+          </div>
+        </div>
+
+        <!-- ═══════════════════════════════ PREFLIGHT ══════════════════════ -->
+        <div id="section-preflight" class="section">
+          <h2 class="text-xl font-bold mb-1">Dependency Health</h2>
+          <p class="text-gray-400 text-sm mb-6">Verify all runtime prerequisites before running simulations. Missing dependencies cause simulator bugs, not security blocks.</p>
+
+          <!-- Action buttons -->
+          <div class="flex flex-wrap gap-3 mb-6">
+            <button onclick="runPreflight()"
+              class="bg-indigo-700 hover:bg-indigo-600 text-white text-sm font-semibold px-4 py-2 rounded-lg">
+              ↻ Re-run Preflight
+            </button>
+            <button onclick="apiPost('/api/preflight/install-browsers').then(runPreflight)"
+              class="bg-gray-700 hover:bg-gray-600 text-white text-sm font-semibold px-4 py-2 rounded-lg">
+              Install Browsers
+            </button>
+            <button onclick="apiPost('/api/preflight/install-node').then(runPreflight)"
+              class="bg-gray-700 hover:bg-gray-600 text-white text-sm font-semibold px-4 py-2 rounded-lg">
+              Install Node Toolchain
+            </button>
+            <button onclick="apiPost('/api/preflight/repair').then(runPreflight)"
+              class="bg-amber-700 hover:bg-amber-600 text-white text-sm font-semibold px-4 py-2 rounded-lg">
+              Repair All Dependencies
+            </button>
+          </div>
+
+          <!-- Dependency grid -->
+          <div id="preflight-grid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-6">
+            <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 text-center text-gray-500 text-sm col-span-4">
+              Click "Re-run Preflight" to check dependencies…
+            </div>
+          </div>
+
+          <!-- Notes -->
+          <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
+            <h3 class="font-semibold mb-3 text-sm">Remediation Guide</h3>
+            <div class="space-y-2 text-xs text-gray-400">
+              <div><span class="text-amber-400 font-mono">curl missing</span> — The simulator will use Python urllib as a fallback. No action needed.</div>
+              <div><span class="text-amber-400 font-mono">node/npm/npx missing</span> — MCP npm installs will fall back to config-only mode. Click "Install Node Toolchain" or install from <span class="text-gray-300">nodejs.org</span>.</div>
+              <div><span class="text-amber-400 font-mono">chromium missing</span> — Web simulation will fail. Click "Install Browsers" or run: <span class="text-gray-300 font-mono">python -m playwright install chromium</span></div>
+              <div><span class="text-amber-400 font-mono">ollama missing</span> — Only affects the Ollama application installer test. Optional.</div>
+              <div><span class="text-green-400 font-mono">API probe</span> — HTTP 401/403 from OpenAI/Anthropic means traffic was transmitted successfully. This is expected behavior with test credentials.</div>
+            </div>
           </div>
         </div>
 

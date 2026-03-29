@@ -60,5 +60,4 @@ class EventBus:
         self.history.clear()
 
 
-# Global singleton — imported by routes and automation modules
 bus = EventBus()

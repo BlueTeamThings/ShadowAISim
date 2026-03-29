@@ -1,0 +1,6 @@
+{
+  "type": "test",
+  "purpose": "mcp_filesystem_simulation",
+  "sensitive": false,
+  "note": "synthetic data only"
+}
