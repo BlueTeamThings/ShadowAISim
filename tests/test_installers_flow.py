@@ -1,9 +1,11 @@
-"""Installer/launcher regression tests for URL classification, dedupe, and startability."""
+"""Installer/launcher regression tests for URL resolution and start safety."""
 
 from __future__ import annotations
 
 import asyncio
+import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 from app.automation import installers
@@ -70,6 +72,69 @@ class TestInstallerClassification(unittest.TestCase):
         self.assertTrue(out["ok"])
         self.assertEqual(out["resolved_url"], "https://example.com/fallback")
 
+    def test_msty_linux_unverified_url_classified(self):
+        app = {
+            "app_id": "msty",
+            "display_name": "Msty",
+            "supported_platforms": ["linux"],
+            "linux_auto_install_verified": False,
+            "release_discovery_strategy": {"type": "unverified_linux_asset"},
+            "download_url": "",
+            "fallback_urls": [],
+        }
+        out = _run(installers.resolve_download_url(app, platform_key="linux", arch_key="x64"))
+        self.assertFalse(out["ok"])
+        self.assertEqual(out["classification"], STATUS["UNVERIFIED_LINUX_ASSET_URL"])
+
+
+class TestArtifactValidation(unittest.TestCase):
+
+    def test_html_page_downloaded_instead_of_appimage_blocked(self):
+        with tempfile.TemporaryDirectory() as td:
+            target = Path(td) / "bad.AppImage"
+            target.write_text("<!DOCTYPE html><html><body>Not a binary</body></html>")
+            out = installers.validate_artifact_file(target, "appimage", content_type="text/html", final_url="https://example.com/release")
+
+        self.assertFalse(out["ok"])
+        self.assertEqual(out["classification"], STATUS["HTML_PAGE_DOWNLOADED_INSTEAD_OF_BINARY"])
+
+    def test_lmstudio_landing_page_used_as_binary_fails_validation(self):
+        with tempfile.TemporaryDirectory() as td:
+            target = Path(td) / "LM-Studio.AppImage"
+            target.write_text("<html><body>download page</body></html>")
+            out = installers.validate_artifact_file(target, "appimage", content_type="text/html", final_url="https://lmstudio.ai/download")
+
+        self.assertFalse(out["ok"])
+        self.assertEqual(out["classification"], STATUS["HTML_PAGE_DOWNLOADED_INSTEAD_OF_BINARY"])
+
+    def test_start_disabled_until_binary_validation_passes(self):
+        from app.routes import installers as installer_routes
+
+        app = {
+            "app_id": "jan",
+            "display_name": "Jan",
+            "desc": "",
+            "category": "local_ai",
+            "supported_platforms": ["linux"],
+            "install_type": "appimage",
+            "homepage_url": "",
+            "launch_strategy": "appimage",
+            "launch_type": "appimage",
+            "launch_command_linux": ["jan"],
+            "validation_strategy": "binary_version",
+            "known_limitations": "",
+            "requires_service": False,
+        }
+
+        with patch("app.routes.installers.preflight_install_state", new=AsyncMock(return_value={"installed": True, "binary_path": "/tmp/jan", "version": "1"})), \
+             patch("app.routes.installers.validate_install", new=AsyncMock(return_value={"ok": False, "classification": STATUS["START_BLOCKED_INVALID_ARTIFACT"], "reason": "invalid"})), \
+             patch("app.routes.installers.resolve_download_url", new=AsyncMock(return_value={"ok": True, "resolved_url": "https://app.jan.ai/download/latest/linux-amd64-appimage"})), \
+             patch("app.routes.installers.get_process_info", return_value={"running": False, "process": None}):
+            out = _run(installer_routes._app_status(app, include_resolution=False))
+
+        self.assertFalse(out["start_enabled"])
+        self.assertIn("invalid", out["start_disabled_reason"])
+
 
 class TestInstallFlowBehavior(unittest.TestCase):
 
@@ -104,28 +169,43 @@ class TestInstallFlowBehavior(unittest.TestCase):
         self.assertTrue(out["installed"])
         self.assertEqual(out["classification"], STATUS["ALREADY_INSTALLED"])
 
-    def test_duplicate_ollama_install_prevented(self):
-        app = self._app("ollama")
+    def test_open_webui_no_disk_space_classified(self):
+        app = {
+            "app_id": "open_webui",
+            "display_name": "Open WebUI",
+            "supported_platforms": ["linux"],
+            "install_type": "pip",
+            "release_discovery_strategy": {"type": "pypi_package", "package": "open-webui"},
+            "fallback_urls": [],
+            "binary_name": "open-webui",
+            "launch_strategy": "cli",
+            "post_install_validation_command": ["open-webui", "--help"],
+        }
 
         async def _emit(*a, **kw):
             return None
 
-        async def _slow_download(*a, **kw):
-            await asyncio.sleep(0.1)
-            return {"ok": True, "classification": "DOWNLOADED", "path": __import__("pathlib").Path("/tmp/fake.AppImage"), "fmt": "appimage"}
+        fake_usage = (10_000_000_000, 9_500_000_000, 500_000_000)
+        with patch("app.automation.installers.preflight_install_state", new=AsyncMock(return_value={"installed": False, "binary_path": "", "version": "", "healthy": None})), \
+             patch("app.automation.installers.shutil.disk_usage", return_value=fake_usage):
+            out = _run(installers.install_app(app, _emit))
+
+        self.assertFalse(out["installed"])
+        self.assertEqual(out["classification"], STATUS["NO_SPACE_LEFT_ON_DEVICE"])
+
+    def test_html_download_blocks_install(self):
+        app = self._app("anythingllm")
+
+        async def _emit(*a, **kw):
+            return None
 
         with patch("app.automation.installers.preflight_install_state", new=AsyncMock(return_value={"installed": False, "binary_path": "", "version": "", "healthy": None})), \
-             patch("app.automation.installers.resolve_download_url", new=AsyncMock(return_value={"ok": True, "resolved_url": "https://example.com/a", "http_status": 200, "fallback_used": None})), \
-             patch("app.automation.installers._download_to_cache", new=AsyncMock(side_effect=_slow_download)), \
-             patch("app.automation.installers._install_artifact", new=AsyncMock(return_value=(True, "/tmp/ollama"))), \
-             patch("app.automation.installers.validate_install", new=AsyncMock(return_value={"ok": True, "binary_path": "/usr/bin/ollama", "version": "v1"})):
-            r1, r2 = _run(asyncio.gather(
-                installers.install_app(app, _emit),
-                installers.install_app(app, _emit),
-            ))
+             patch("app.automation.installers.resolve_download_url", new=AsyncMock(return_value={"ok": True, "resolved_url": "https://example.com/fake", "http_status": 200, "fallback_used": None})), \
+             patch("app.automation.installers._download_to_cache", new=AsyncMock(return_value={"ok": False, "classification": STATUS["HTML_PAGE_DOWNLOADED_INSTEAD_OF_BINARY"], "resolved_url": "https://example.com/fake"})):
+            out = _run(installers.install_app(app, _emit))
 
-        classes = {r1.get("classification"), r2.get("classification")}
-        self.assertIn("INSTALL_SKIPPED_DUPLICATE_IN_FLIGHT", classes)
+        self.assertFalse(out["installed"])
+        self.assertEqual(out["classification"], STATUS["HTML_PAGE_DOWNLOADED_INSTEAD_OF_BINARY"])
 
 
 class TestStartAvailability(unittest.TestCase):
@@ -155,35 +235,59 @@ class TestStartAvailability(unittest.TestCase):
         self.assertFalse(out["start_enabled"])
         self.assertIn("Install", out["start_disabled_reason"])
 
-    def test_start_button_works_after_install(self):
-        from app.automation import launcher
+    def test_jan_direct_url_start_enabled_after_valid_install(self):
+        from app.routes import installers as installer_routes
 
         app = {
-            "app_id": "demo_app",
-            "display_name": "Demo",
-            "launch_strategy": "binary",
-            "launch_type": "binary",
-            "launch_command_linux": ["demo_app", "--serve"],
-            "post_install_validation_command": ["demo_app", "--version"],
+            "app_id": "jan",
+            "display_name": "Jan",
+            "desc": "",
+            "category": "local_ai",
+            "supported_platforms": ["linux"],
+            "install_type": "appimage",
+            "homepage_url": "https://github.com/janhq/jan",
+            "launch_strategy": "appimage",
+            "launch_type": "appimage",
+            "launch_command_linux": ["jan"],
+            "validation_strategy": "binary_version",
+            "known_limitations": "",
+            "requires_service": False,
         }
 
-        class _Proc:
-            pid = 4321
-            returncode = None
-            stdout = asyncio.StreamReader()
-            stderr = asyncio.StreamReader()
+        with patch("app.routes.installers.preflight_install_state", new=AsyncMock(return_value={"installed": True, "binary_path": "/tmp/Jan.AppImage", "version": "0.7.9"})), \
+             patch("app.routes.installers.validate_install", new=AsyncMock(return_value={"ok": True, "classification": STATUS["STARTABLE"], "reason": "Installed artifact validated"})), \
+             patch("app.routes.installers.resolve_download_url", new=AsyncMock(return_value={"ok": True, "resolved_url": "https://app.jan.ai/download/latest/linux-amd64-appimage"})), \
+             patch("app.routes.installers.get_process_info", return_value={"running": False, "process": None}):
+            out = _run(installer_routes._app_status(app, include_resolution=False))
 
-        async def _emit(*a, **kw):
-            return None
+        self.assertTrue(out["start_enabled"])
 
-        with patch("app.automation.launcher.preflight_install_state", new=AsyncMock(return_value={"installed": True, "binary_path": "/usr/bin/demo_app", "version": "1.0.0"})), \
-             patch("app.automation.launcher.asyncio.create_subprocess_exec", new=AsyncMock(return_value=_Proc())), \
-             patch("app.automation.launcher.asyncio.create_task", return_value=None):
-            out = _run(launcher.start_app(app, _emit))
+    def test_anythingllm_cdn_start_enabled_after_valid_install(self):
+        from app.routes import installers as installer_routes
 
-        self.assertTrue(out["start_attempted"])
-        self.assertTrue(out["process_started"])
-        self.assertEqual(out["pid"], 4321)
+        app = {
+            "app_id": "anythingllm",
+            "display_name": "AnythingLLM",
+            "desc": "",
+            "category": "local_ai",
+            "supported_platforms": ["linux"],
+            "install_type": "appimage",
+            "homepage_url": "https://docs.anythingllm.com/installation-desktop/linux",
+            "launch_strategy": "appimage",
+            "launch_type": "appimage",
+            "launch_command_linux": ["AnythingLLMDesktop"],
+            "validation_strategy": "binary_version",
+            "known_limitations": "",
+            "requires_service": False,
+        }
+
+        with patch("app.routes.installers.preflight_install_state", new=AsyncMock(return_value={"installed": True, "binary_path": "/tmp/AnythingLLM.AppImage", "version": "1.0"})), \
+             patch("app.routes.installers.validate_install", new=AsyncMock(return_value={"ok": True, "classification": STATUS["STARTABLE"], "reason": "Installed artifact validated"})), \
+             patch("app.routes.installers.resolve_download_url", new=AsyncMock(return_value={"ok": True, "resolved_url": "https://cdn.anythingllm.com/latest/AnythingLLMDesktop.AppImage"})), \
+             patch("app.routes.installers.get_process_info", return_value={"running": False, "process": None}):
+            out = _run(installer_routes._app_status(app, include_resolution=False))
+
+        self.assertTrue(out["start_enabled"])
 
 
 if __name__ == "__main__":

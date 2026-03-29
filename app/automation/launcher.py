@@ -13,7 +13,7 @@ from typing import Awaitable, Callable
 
 import httpx
 
-from app.automation.installers import STATUS, preflight_install_state
+from app.automation.installers import STATUS, preflight_install_state, validate_install
 
 Emitter = Callable[..., Awaitable[None]]
 
@@ -90,9 +90,9 @@ def _build_launch_command(app: dict, preflight: dict) -> list[str]:
 async def start_app(app: dict, emit: Emitter) -> dict:
     app_id = app["app_id"]
     pre = await preflight_install_state(app)
-    startable = bool(app.get("launch_strategy") and app.get("launch_strategy") != "manual")
+    validation = await validate_install(app)
 
-    if not pre.get("installed") and not startable:
+    if not pre.get("installed"):
         return {
             "app_id": app_id,
             "installed": False,
@@ -100,7 +100,31 @@ async def start_app(app: dict, emit: Emitter) -> dict:
             "process_started": False,
             "pid": None,
             "classification": STATUS["START_FAILED"],
-            "message": "App is not installed and has no start strategy",
+            "message": "App is not installed",
+        }
+
+    if not validation.get("ok"):
+        return {
+            "app_id": app_id,
+            "installed": True,
+            "start_attempted": False,
+            "process_started": False,
+            "pid": None,
+            "classification": STATUS["START_BLOCKED_INVALID_ARTIFACT"],
+            "message": validation.get("reason", "Artifact validation failed"),
+        }
+
+    # Prefer service management for Ollama before direct user-space process launch.
+    if app_id == "ollama":
+        svc = await ollama_service_action("start", emit)
+        return {
+            "app_id": app_id,
+            "installed": True,
+            "start_attempted": True,
+            "process_started": bool(svc.get("ok")),
+            "pid": svc.get("pid"),
+            "classification": STATUS["STARTABLE"] if svc.get("ok") else STATUS["START_FAILED"],
+            "message": svc.get("message", "service action completed"),
         }
 
     if app_id in _PROCESSES:
@@ -126,7 +150,7 @@ async def start_app(app: dict, emit: Emitter) -> dict:
             "start_attempted": False,
             "process_started": False,
             "pid": None,
-            "classification": STATUS["MANUAL_DOWNLOAD_REQUIRED"],
+            "classification": STATUS["START_FAILED"],
             "message": "No launch command is defined for this app on this platform",
         }
 

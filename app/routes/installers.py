@@ -46,6 +46,19 @@ async def _app_status(app: dict, include_resolution: bool = True) -> dict:
     if include_resolution:
         resolved = await resolve_download_url(app)
 
+    validation = await validate_install(app)
+    launch_cmd = app.get("launch_command_linux") if "linux" in app.get("supported_platforms", []) else []
+    launch_defined = bool(launch_cmd) or app.get("launch_type") == "service"
+    start_enabled = bool(pre.get("installed") and validation.get("ok") and launch_defined)
+    if not pre.get("installed"):
+        start_reason = "Install first"
+    elif not validation.get("ok"):
+        start_reason = validation.get("reason", "Post-install validation failed")
+    elif not launch_defined:
+        start_reason = "No launch command for this platform"
+    else:
+        start_reason = ""
+
     install_status = last.get("classification")
     if not install_status:
         install_status = STATUS["ALREADY_INSTALLED"] if pre.get("installed") else "NOT_INSTALLED"
@@ -68,11 +81,14 @@ async def _app_status(app: dict, include_resolution: bool = True) -> dict:
         "version": pre.get("version", last.get("version", "")),
         "running": proc.get("running", False),
         "process": proc.get("process"),
-        "start_enabled": bool(pre.get("installed")),
-        "start_disabled_reason": "Install first" if not pre.get("installed") else "",
+        "start_enabled": start_enabled,
+        "start_disabled_reason": start_reason,
         "start_visible": bool(pre.get("installed") or app.get("launch_strategy") not in (None, "manual")),
         "launch_strategy": app.get("launch_strategy"),
         "validation_strategy": app.get("validation_strategy"),
+        "validation_passed": validation.get("ok", False),
+        "validation_classification": validation.get("classification"),
+        "validation_reason": validation.get("reason", ""),
         "known_limitations": app.get("known_limitations"),
         "requires_service": app.get("requires_service", False),
     }

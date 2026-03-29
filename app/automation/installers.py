@@ -11,6 +11,7 @@ import shutil
 import stat
 import subprocess
 import sys
+import tarfile
 import tempfile
 from pathlib import Path
 from typing import Awaitable, Callable
@@ -44,7 +45,17 @@ STATUS = {
     "STARTABLE": "STARTABLE",
     "START_FAILED": "START_FAILED",
     "MANUAL_DOWNLOAD_REQUIRED": "MANUAL_DOWNLOAD_REQUIRED",
+    "HTML_PAGE_DOWNLOADED_INSTEAD_OF_BINARY": "HTML_PAGE_DOWNLOADED_INSTEAD_OF_BINARY",
+    "DOWNLOADED_INVALID_ARTIFACT": "DOWNLOADED_INVALID_ARTIFACT",
+    "URL_RESOLVED_TO_RELEASE_PAGE": "URL_RESOLVED_TO_RELEASE_PAGE",
+    "START_BLOCKED_INVALID_ARTIFACT": "START_BLOCKED_INVALID_ARTIFACT",
+    "NO_SPACE_LEFT_ON_DEVICE": "NO_SPACE_LEFT_ON_DEVICE",
+    "INSTALLER_FAILED_AFTER_VALID_DOWNLOAD": "INSTALLER_FAILED_AFTER_VALID_DOWNLOAD",
+    "UNVERIFIED_LINUX_ASSET_URL": "UNVERIFIED_LINUX_ASSET_URL",
 }
+
+MIN_EXPECTED_INSTALLER_BYTES = 256 * 1024
+MIN_FREE_SPACE_BYTES = 2 * 1024 * 1024 * 1024
 
 DOWNLOAD_CACHE_DIR = Path("simulator_data/download_cache")
 DOWNLOAD_CACHE_DIR.mkdir(parents=True, exist_ok=True)
@@ -236,6 +247,24 @@ def _binary_exists(app: dict) -> tuple[bool, str]:
     if candidate.exists():
         return True, str(candidate)
 
+    # Search common local install locations for run-installers that drop binaries.
+    local_roots = [
+        Path.home() / ".local" / "bin",
+        Path.home() / ".local" / "share",
+        Path.home() / ".local" / "share" / "applications",
+    ]
+    probes = {binary_name.lower(), app.get("app_id", "").lower(), app.get("display_name", "").replace(" ", "").lower()}
+    for root in local_roots:
+        if not root.exists():
+            continue
+        for path in root.rglob("*"):
+            if not path.is_file():
+                continue
+            pname = path.name.lower()
+            if any(token and token in pname for token in probes):
+                if _is_executable_file(path):
+                    return True, str(path)
+
     return False, ""
 
 
@@ -351,20 +380,30 @@ async def _head_validate(url: str) -> dict:
             async with httpx.AsyncClient(timeout=20.0, follow_redirects=True) as client:
                 resp = await client.get(url, headers={"Range": "bytes=0-0"})
 
+        final_url = str(resp.url)
+        if _is_release_page_url(final_url):
+            return {
+                "ok": False,
+                "classification": STATUS["URL_RESOLVED_TO_RELEASE_PAGE"],
+                "http_status": resp.status_code,
+                "resolved_url": final_url,
+            }
+
         if resp.status_code >= 400:
             return {
                 "ok": False,
                 "classification": _status_from_http(resp.status_code),
                 "http_status": resp.status_code,
-                "resolved_url": str(resp.url),
+                "resolved_url": final_url,
             }
 
         return {
             "ok": True,
             "classification": STATUS["INSTALLED_OK"],
             "http_status": resp.status_code,
-            "resolved_url": str(resp.url),
+            "resolved_url": final_url,
             "content_length": resp.headers.get("content-length"),
+            "content_type": resp.headers.get("content-type", ""),
             "etag": resp.headers.get("etag"),
             "last_modified": resp.headers.get("last-modified"),
         }
@@ -375,6 +414,62 @@ async def _head_validate(url: str) -> dict:
             "message": str(exc),
             "resolved_url": url,
         }
+
+
+async def _resolve_lmstudio_linux_asset(app: dict) -> dict:
+    discovery_page = (app.get("release_discovery_strategy") or {}).get("discovery_page") or app.get("download_url")
+    pattern = re.compile(r"https://installers\.lmstudio\.ai/linux/x64/([^/]+)/LM-Studio-([^/]+)-x64\.AppImage")
+
+    try:
+        async with httpx.AsyncClient(timeout=20.0, follow_redirects=True) as client:
+            if discovery_page:
+                page = await client.get(discovery_page)
+                if page.status_code == 200:
+                    match = pattern.search(page.text)
+                    if match:
+                        version = match.group(1)
+                        return {
+                            "ok": True,
+                            "resolved_url": f"https://installers.lmstudio.ai/linux/x64/{version}/LM-Studio-{version}-x64.AppImage",
+                            "version": version,
+                            "release_page": discovery_page,
+                        }
+
+            for endpoint in (
+                "https://installers.lmstudio.ai/linux/x64/latest.json",
+                "https://installers.lmstudio.ai/linux/x64/latest",
+            ):
+                resp = await client.get(endpoint)
+                if resp.status_code != 200:
+                    continue
+                version = ""
+                ctype = (resp.headers.get("content-type") or "").lower()
+                if "json" in ctype:
+                    body = resp.json()
+                    version = str(body.get("version") or body.get("latest") or "").strip()
+                else:
+                    version = resp.text.strip().splitlines()[0].strip()
+                if version and re.match(r"^[0-9A-Za-z._-]+$", version):
+                    return {
+                        "ok": True,
+                        "resolved_url": f"https://installers.lmstudio.ai/linux/x64/{version}/LM-Studio-{version}-x64.AppImage",
+                        "version": version,
+                        "release_page": discovery_page,
+                    }
+    except Exception as exc:
+        return {
+            "ok": False,
+            "classification": classify_network_error(exc),
+            "message": str(exc),
+            "resolved_url": discovery_page or "",
+        }
+
+    return {
+        "ok": False,
+        "classification": STATUS["URL_INVALID_OR_STALE"],
+        "message": "Unable to resolve LM Studio direct AppImage URL",
+        "resolved_url": discovery_page or "",
+    }
 
 
 async def resolve_download_url(app: dict, platform_key: str = PLATFORM_KEY, arch_key: str = ARCH_KEY) -> dict:
@@ -393,6 +488,16 @@ async def resolve_download_url(app: dict, platform_key: str = PLATFORM_KEY, arch
         _URL_CACHE[cache_key] = out
         return dict(out)
 
+    if SYSTEM == "Linux" and app.get("linux_auto_install_verified") is False:
+        out = {
+            "ok": False,
+            "classification": STATUS["UNVERIFIED_LINUX_ASSET_URL"],
+            "resolved_url": "",
+            "message": f"{app['display_name']} Linux asset URL is unverified",
+        }
+        _URL_CACHE[cache_key] = out
+        return dict(out)
+
     strategy = (app.get("release_discovery_strategy") or {}).get("type", "stable_endpoint")
     candidate_urls: list[str] = []
     fallback_used = None
@@ -407,6 +512,15 @@ async def resolve_download_url(app: dict, platform_key: str = PLATFORM_KEY, arch
                     candidate_urls.append(release_page)
             else:
                 fallback_used = "github_release_api"
+        elif strategy == "lmstudio_linux_appimage" and platform_key == "linux":
+            lmstudio_res = await _resolve_lmstudio_linux_asset(app)
+            if lmstudio_res.get("ok"):
+                candidate_urls.append(lmstudio_res["resolved_url"])
+                if lmstudio_res.get("release_page"):
+                    candidate_urls.append(lmstudio_res["release_page"])
+            else:
+                _URL_CACHE[cache_key] = lmstudio_res
+                return dict(lmstudio_res)
         elif strategy == "pypi_package":
             package = (app.get("release_discovery_strategy") or {}).get("package")
             if package:
@@ -417,7 +531,7 @@ async def resolve_download_url(app: dict, platform_key: str = PLATFORM_KEY, arch
         if platform_url:
             candidate_urls.insert(0, platform_url)
 
-        if app.get("download_url"):
+        if app.get("download_url") and not (strategy == "lmstudio_linux_appimage" and platform_key == "linux"):
             candidate_urls.append(app["download_url"])
         candidate_urls.extend(app.get("fallback_urls") or [])
 
@@ -440,6 +554,7 @@ async def resolve_download_url(app: dict, platform_key: str = PLATFORM_KEY, arch
                     "http_status": check.get("http_status"),
                     "fallback_used": fallback_used if idx == 0 else unique_candidates[idx - 1],
                     "content_length": check.get("content_length"),
+                    "content_type": check.get("content_type", ""),
                     "etag": check.get("etag"),
                     "last_modified": check.get("last_modified"),
                 }
@@ -451,6 +566,7 @@ async def resolve_download_url(app: dict, platform_key: str = PLATFORM_KEY, arch
                 "classification": check.get("classification", STATUS["URL_INVALID_OR_STALE"]),
                 "resolved_url": check.get("resolved_url", candidate),
                 "http_status": check.get("http_status"),
+                "content_type": check.get("content_type", ""),
                 "fallback_used": candidate,
                 "message": check.get("message", "URL check failed"),
             }
@@ -476,6 +592,149 @@ def _safe_name(app_id: str) -> str:
     return re.sub(r"[^a-zA-Z0-9_.-]", "_", app_id)
 
 
+def _looks_like_html(sample: bytes, content_type: str) -> bool:
+    probe = sample[:1024].lstrip().lower()
+    content = (content_type or "").lower()
+    if "text/html" in content or "application/xhtml" in content:
+        return True
+    if probe.startswith(b"<!doctype html") or probe.startswith(b"<html"):
+        return True
+    if b"<head" in probe and b"<body" in probe:
+        return True
+    return False
+
+
+def _is_release_page_url(url: str) -> bool:
+    parsed = urlparse(url)
+    return "/releases/tag/" in parsed.path.lower()
+
+
+def _peek_bytes(path: Path, limit: int = 1024) -> bytes:
+    with open(path, "rb") as fh:
+        return fh.read(limit)
+
+
+def _is_executable_file(path: Path) -> bool:
+    return bool(path.exists() and os.access(path, os.X_OK))
+
+
+def validate_artifact_file(path: Path, fmt: str, content_type: str = "", final_url: str = "") -> dict:
+    if not path.exists():
+        return {
+            "ok": False,
+            "classification": STATUS["DOWNLOADED_INVALID_ARTIFACT"],
+            "reason": "Downloaded artifact missing on disk",
+        }
+
+    size = path.stat().st_size
+    sample = _peek_bytes(path)
+    if _looks_like_html(sample, content_type):
+        return {
+            "ok": False,
+            "classification": STATUS["HTML_PAGE_DOWNLOADED_INSTEAD_OF_BINARY"],
+            "reason": "HTML payload downloaded instead of binary",
+            "size": size,
+            "final_url": final_url,
+        }
+
+    if fmt in {"appimage", "run", "deb", "tar.gz", "tar.bz2", "zip", "msi", "exe"} and size < MIN_EXPECTED_INSTALLER_BYTES:
+        return {
+            "ok": False,
+            "classification": STATUS["DOWNLOADED_INVALID_ARTIFACT"],
+            "reason": f"Installer too small ({size} bytes)",
+            "size": size,
+            "final_url": final_url,
+        }
+
+    if fmt == "appimage":
+        if not sample.startswith(b"\x7fELF"):
+            return {
+                "ok": False,
+                "classification": STATUS["DOWNLOADED_INVALID_ARTIFACT"],
+                "reason": "AppImage is not an ELF binary",
+                "size": size,
+                "final_url": final_url,
+            }
+
+    if fmt in {"run", "sh"}:
+        if not sample.startswith(b"#!") and not sample.startswith(b"\x7fELF"):
+            return {
+                "ok": False,
+                "classification": STATUS["DOWNLOADED_INVALID_ARTIFACT"],
+                "reason": "Installer script is missing shebang/header",
+                "size": size,
+                "final_url": final_url,
+            }
+
+    if fmt == "deb" and not sample.startswith(b"!<arch>\n"):
+        return {
+            "ok": False,
+            "classification": STATUS["DOWNLOADED_INVALID_ARTIFACT"],
+            "reason": "Debian package header invalid",
+            "size": size,
+            "final_url": final_url,
+        }
+
+    if fmt in {"tar.gz", "tar.bz2"}:
+        try:
+            mode = "r:gz" if fmt == "tar.gz" else "r:bz2"
+            with tarfile.open(path, mode):
+                pass
+        except Exception:
+            return {
+                "ok": False,
+                "classification": STATUS["DOWNLOADED_INVALID_ARTIFACT"],
+                "reason": "Archive is unreadable",
+                "size": size,
+                "final_url": final_url,
+            }
+
+    return {
+        "ok": True,
+        "classification": STATUS["INSTALLED_OK"],
+        "size": size,
+        "final_url": final_url,
+    }
+
+
+def validate_start_artifact(binary_path: str, launch_type: str) -> dict:
+    path = Path(binary_path)
+    if not path.exists():
+        return {
+            "ok": False,
+            "classification": STATUS["START_BLOCKED_INVALID_ARTIFACT"],
+            "reason": "Launch target does not exist",
+        }
+
+    sample = _peek_bytes(path)
+    if _looks_like_html(sample, ""):
+        return {
+            "ok": False,
+            "classification": STATUS["START_BLOCKED_INVALID_ARTIFACT"],
+            "reason": "Launch target is HTML/text, not an executable",
+        }
+
+    if launch_type in {"appimage", "binary", "cli"} and not _is_executable_file(path):
+        return {
+            "ok": False,
+            "classification": STATUS["START_BLOCKED_INVALID_ARTIFACT"],
+            "reason": "Launch target is not executable",
+        }
+
+    if launch_type == "appimage" and not sample.startswith(b"\x7fELF"):
+        return {
+            "ok": False,
+            "classification": STATUS["START_BLOCKED_INVALID_ARTIFACT"],
+            "reason": "AppImage launch target is not ELF",
+        }
+
+    return {
+        "ok": True,
+        "classification": STATUS["STARTABLE"],
+        "reason": "artifact valid",
+    }
+
+
 async def _download_to_cache(app: dict, resolved: dict, emit: Emitter) -> dict:
     url = resolved.get("resolved_url")
     if not url:
@@ -487,6 +746,7 @@ async def _download_to_cache(app: dict, resolved: dict, emit: Emitter) -> dict:
     meta_path = _artifact_meta_path(cache_path)
 
     expected_len = resolved.get("content_length")
+    expected_ctype = resolved.get("content_type", "")
     if cache_path.exists() and meta_path.exists():
         try:
             meta = json.loads(meta_path.read_text())
@@ -516,25 +776,66 @@ async def _download_to_cache(app: dict, resolved: dict, emit: Emitter) -> dict:
                     }
 
                 size = 0
+                final_url = str(resp.url)
+                content_type = resp.headers.get("content-type", expected_ctype)
+                redirect_chain = [str(item.url) for item in getattr(resp, "history", [])]
                 with open(cache_path, "wb") as fh:
                     async for chunk in resp.aiter_bytes(_CHUNK):
                         fh.write(chunk)
                         size += len(chunk)
 
+        if _is_release_page_url(final_url):
+            return {
+                "ok": False,
+                "classification": STATUS["URL_RESOLVED_TO_RELEASE_PAGE"],
+                "message": "Resolved URL points to a GitHub release page, not a binary asset",
+                "resolved_url": final_url,
+                "redirect_chain": redirect_chain,
+            }
+
+        validation = validate_artifact_file(cache_path, fmt, content_type=content_type, final_url=final_url)
+        if not validation.get("ok"):
+            await emit(
+                "WARN",
+                "INSTALLER",
+                f"{app['display_name']}: invalid downloaded artifact ({validation.get('reason')})",
+                app["app_id"],
+                classification=validation.get("classification", STATUS["DOWNLOADED_INVALID_ARTIFACT"]),
+                resolved_url=final_url,
+                redirect_chain=redirect_chain,
+                content_type=content_type,
+                artifact_size=validation.get("size", size),
+                remediation_hint="Do not use release/download HTML pages as binary URLs",
+            )
+            return {
+                "ok": False,
+                "classification": validation.get("classification", STATUS["DOWNLOADED_INVALID_ARTIFACT"]),
+                "message": validation.get("reason", "Downloaded artifact validation failed"),
+                "resolved_url": final_url,
+                "redirect_chain": redirect_chain,
+                "content_type": content_type,
+                "artifact_size": validation.get("size", size),
+            }
+
         meta_path.write_text(json.dumps({
-            "resolved_url": url,
+            "resolved_url": final_url,
             "size": cache_path.stat().st_size,
+            "content_type": content_type,
+            "redirect_chain": redirect_chain,
             "etag": resolved.get("etag"),
             "last_modified": resolved.get("last_modified"),
         }, indent=2))
-        _ARTIFACT_CACHE[url] = cache_path
+        _ARTIFACT_CACHE[final_url] = cache_path
         await emit("INFO", "INSTALLER", f"{app['display_name']}: Download complete ({size / (1024 * 1024):.1f} MB)", url, classification="DOWNLOADED")
         return {
             "ok": True,
             "classification": "DOWNLOADED",
             "path": cache_path,
             "fmt": fmt,
-            "resolved_url": url,
+            "resolved_url": final_url,
+            "redirect_chain": redirect_chain,
+            "content_type": content_type,
+            "artifact_size": size,
         }
     except Exception as exc:
         return {
@@ -602,7 +903,10 @@ async def _install_linux(path: Path, fmt: str, app: dict, emit: Emitter) -> tupl
         r = await _run([str(path), "--silent"])
         if r.returncode != 0:
             r = await _run([str(path)])
-        return r.returncode == 0, ""
+        if r.returncode != 0:
+            return False, ""
+        installed, discovered = _binary_exists(app)
+        return True, discovered if installed else ""
 
     # Fallback direct execution
     _mark_exec(path)
@@ -653,13 +957,27 @@ async def validate_install(app: dict) -> dict:
             "installed": False,
             "binary_path": "",
             "version": "",
+            "reason": "App not installed",
         }
+
+    artifact_check = validate_start_artifact(pre["binary_path"], app.get("launch_type", "binary"))
+    if not artifact_check.get("ok"):
+        return {
+            "ok": False,
+            "classification": artifact_check.get("classification", STATUS["START_BLOCKED_INVALID_ARTIFACT"]),
+            "installed": True,
+            "binary_path": pre["binary_path"],
+            "version": pre.get("version", ""),
+            "reason": artifact_check.get("reason", "Artifact validation failed"),
+        }
+
     return {
         "ok": True,
         "classification": STATUS["STARTABLE"],
         "installed": True,
         "binary_path": pre["binary_path"],
         "version": pre.get("version", ""),
+        "reason": "Installed artifact validated",
     }
 
 
@@ -694,6 +1012,7 @@ async def install_app(installer: dict, emit: Emitter, reinstall: bool = False) -
 
         pre = await preflight_install_state(app)
         if pre["installed"] and not reinstall:
+            validated = await validate_install(app)
             await emit("SUCCESS", "INSTALLER", f"{name}: Already installed, skipping reinstall", app_id, classification=STATUS["ALREADY_INSTALLED"], binary_path=pre["binary_path"], version=pre.get("version", ""))
             return {
                 "app_id": app_id,
@@ -702,7 +1021,9 @@ async def install_app(installer: dict, emit: Emitter, reinstall: bool = False) -
                 "message": "Already installed",
                 "binary_path": pre["binary_path"],
                 "version": pre.get("version", ""),
-                "startable": True,
+                "startable": validated.get("ok", False),
+                "validation_passed": validated.get("ok", False),
+                "validation_reason": validated.get("reason", ""),
                 "resolved_url": "",
                 "fallback_url_used": None,
                 "http_status": None,
@@ -730,20 +1051,41 @@ async def install_app(installer: dict, emit: Emitter, reinstall: bool = False) -
 
         if install_type == "pip":
             package_name = (app.get("release_discovery_strategy") or {}).get("package") or app.get("binary_name") or app_id
+            if app_id == "open_webui":
+                free = shutil.disk_usage(str(Path.home())).free
+                if free < MIN_FREE_SPACE_BYTES:
+                    await emit(
+                        "WARN",
+                        "INSTALLER",
+                        f"{name}: insufficient disk space for pip install",
+                        app_id,
+                        classification=STATUS["NO_SPACE_LEFT_ON_DEVICE"],
+                        remediation_hint="Free disk space and retry",
+                    )
+                    return {
+                        "app_id": app_id,
+                        "installed": False,
+                        "classification": STATUS["NO_SPACE_LEFT_ON_DEVICE"],
+                        "message": "No space left on device",
+                        "startable": False,
+                    }
+
             await emit("INFO", "INSTALLER", f"{name}: Installing via pip ({package_name})", app_id, classification=STATUS["INSTALLER_STARTED"])
             run = await _run([sys.executable, "-m", "pip", "install", "-U", package_name])
             if run.returncode != 0:
-                await emit("ERROR", "INSTALLER", f"{name}: pip install failed", app_id, classification=STATUS["INSTALLER_FAILED"], remediation_hint=(run.stderr or run.stdout or "")[:200])
+                pip_out = (run.stderr or run.stdout or "")
+                classification = STATUS["NO_SPACE_LEFT_ON_DEVICE"] if "no space left on device" in pip_out.lower() or "errno 28" in pip_out.lower() else STATUS["INSTALLER_FAILED"]
+                await emit("ERROR", "INSTALLER", f"{name}: pip install failed", app_id, classification=classification, remediation_hint=(run.stderr or run.stdout or "")[:200])
                 return {
                     "app_id": app_id,
                     "installed": False,
-                    "classification": STATUS["INSTALLER_FAILED"],
+                    "classification": classification,
                     "message": "pip install failed",
                     "startable": False,
                 }
 
             validated = await validate_install(app)
-            await emit("ALERT", "INSTALLER", f"INSTALLED: {name}", app_id, classification=STATUS["INSTALLED_OK"], binary_path=validated.get("binary_path", ""), version=validated.get("version", ""), validation_state="Validated" if validated.get("ok") else "Installed")
+            await emit("ALERT", "INSTALLER", f"INSTALLED: {name}", app_id, classification=STATUS["INSTALLED_OK"], binary_path=validated.get("binary_path", ""), version=validated.get("version", ""), validation_state="Validated" if validated.get("ok") else "Installed", remediation_hint=validated.get("reason", ""))
             return {
                 "app_id": app_id,
                 "installed": True,
@@ -752,7 +1094,9 @@ async def install_app(installer: dict, emit: Emitter, reinstall: bool = False) -
                 "resolved_url": f"pip://{package_name}",
                 "binary_path": validated.get("binary_path", ""),
                 "version": validated.get("version", ""),
-                "startable": True,
+                "startable": validated.get("ok", False),
+                "validation_passed": validated.get("ok", False),
+                "validation_reason": validated.get("reason", ""),
             }
 
         resolved = await resolve_download_url(app)
@@ -782,17 +1126,18 @@ async def install_app(installer: dict, emit: Emitter, reinstall: bool = False) -
                 "resolved_url": artifact.get("resolved_url", resolved.get("resolved_url")),
                 "fallback_url_used": resolved.get("fallback_used"),
                 "http_status": artifact.get("http_status", resolved.get("http_status")),
+                "redirect_chain": artifact.get("redirect_chain", []),
                 "dns_status": "failed" if artifact.get("classification") == STATUS["DNS_RESOLUTION_FAILED"] else "ok",
                 "startable": False,
             }
 
         ok, installed_path = await _install_artifact(artifact["path"], artifact["fmt"], app, emit)
         if not ok:
-            await emit("ERROR", "INSTALLER", f"{name}: Installer failed", app_id, classification=STATUS["INSTALLER_FAILED"], resolved_url=resolved.get("resolved_url"), remediation_hint="Review installer output and package format")
+            await emit("ERROR", "INSTALLER", f"{name}: Installer failed", app_id, classification=STATUS["INSTALLER_FAILED_AFTER_VALID_DOWNLOAD"], resolved_url=resolved.get("resolved_url"), remediation_hint="Review installer output and package format")
             return {
                 "app_id": app_id,
                 "installed": False,
-                "classification": STATUS["INSTALLER_FAILED"],
+                "classification": STATUS["INSTALLER_FAILED_AFTER_VALID_DOWNLOAD"],
                 "message": "Installer execution failed",
                 "resolved_url": resolved.get("resolved_url"),
                 "fallback_url_used": resolved.get("fallback_used"),
@@ -817,7 +1162,9 @@ async def install_app(installer: dict, emit: Emitter, reinstall: bool = False) -
             "installed_path": installed_path,
             "binary_path": final_binary,
             "version": version,
-            "startable": True,
+            "startable": validated.get("ok", False),
+            "validation_passed": validated.get("ok", False),
+            "validation_reason": validated.get("reason", ""),
         }
     finally:
         async with _INSTALL_LOCK:
@@ -896,12 +1243,26 @@ async def install_group(group: list[dict], emit: Emitter, label: str, reinstall:
 
         if install_type == "pip":
             package_name = (app.get("release_discovery_strategy") or {}).get("package") or app.get("binary_name") or app_id
+            if app_id == "open_webui":
+                free = shutil.disk_usage(str(Path.home())).free
+                if free < MIN_FREE_SPACE_BYTES:
+                    results.append({
+                        "app_id": app_id,
+                        "installed": False,
+                        "classification": STATUS["NO_SPACE_LEFT_ON_DEVICE"],
+                        "message": "No space left on device",
+                        "startable": False,
+                    })
+                    continue
+
             run = await _run([sys.executable, "-m", "pip", "install", "-U", package_name])
             if run.returncode != 0:
+                pip_out = (run.stderr or run.stdout or "")
+                classification = STATUS["NO_SPACE_LEFT_ON_DEVICE"] if "no space left on device" in pip_out.lower() or "errno 28" in pip_out.lower() else STATUS["INSTALLER_FAILED"]
                 results.append({
                     "app_id": app_id,
                     "installed": False,
-                    "classification": STATUS["INSTALLER_FAILED"],
+                    "classification": classification,
                     "message": "pip install failed",
                     "startable": False,
                 })
@@ -917,6 +1278,8 @@ async def install_group(group: list[dict], emit: Emitter, label: str, reinstall:
                 "binary_path": validated.get("binary_path", ""),
                 "version": validated.get("version", ""),
                 "startable": validated.get("ok", False),
+                "validation_passed": validated.get("ok", False),
+                "validation_reason": validated.get("reason", ""),
             })
             continue
 
@@ -938,7 +1301,7 @@ async def install_group(group: list[dict], emit: Emitter, label: str, reinstall:
             results.append({
                 "app_id": app_id,
                 "installed": False,
-                "classification": STATUS["INSTALLER_FAILED"],
+                "classification": STATUS["INSTALLER_FAILED_AFTER_VALID_DOWNLOAD"],
                 "message": "Installer execution failed",
                 "resolved_url": resolved.get("resolved_url", ""),
                 "startable": False,
@@ -956,6 +1319,8 @@ async def install_group(group: list[dict], emit: Emitter, label: str, reinstall:
             "binary_path": validated.get("binary_path", ""),
             "version": validated.get("version", ""),
             "startable": validated.get("ok", False),
+            "validation_passed": validated.get("ok", False),
+            "validation_reason": validated.get("reason", ""),
         })
 
     await emit("INFO", "INSTALLER", f"{label}: group install complete")

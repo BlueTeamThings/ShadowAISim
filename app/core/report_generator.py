@@ -30,6 +30,9 @@ def build_json_report(history: list[dict]) -> str:
                     "resolved_url": e.get("resolved_url", ""),
                     "fallback_url_used": e.get("fallback_url_used"),
                     "http_status": e.get("http_status"),
+                    "content_type": e.get("content_type", ""),
+                    "redirect_chain": e.get("redirect_chain", []),
+                    "artifact_size": e.get("artifact_size"),
                     "dns_status": e.get("dns_status"),
                     "installed_path": e.get("installed_path", ""),
                     "binary_path": e.get("binary_path", ""),
@@ -135,6 +138,7 @@ def build_html_report(history: list[dict]) -> str:
           <th>Target</th>
           <th>Classification</th>
           <th>HTTP</th>
+          <th>Content-Type</th>
           <th>Resolved URL</th>
           <th>Binary</th>
           <th>PID</th>
@@ -167,6 +171,7 @@ def _make_row(e: dict) -> str:
         f"<td style='color:#64748b;font-size:11px;'>{e.get('target','')}</td>"
         f"<td style='color:#a5b4fc;font-size:11px;'>{e.get('classification','')}</td>"
         f"<td style='color:#fbbf24;font-size:11px;'>{e.get('http_status','')}</td>"
+        f"<td style='color:#fbbf24;font-size:11px;'>{e.get('content_type','')}</td>"
         f"<td style='color:#94a3b8;font-size:11px;'>{e.get('resolved_url','')}</td>"
         f"<td style='color:#94a3b8;font-size:11px;'>{e.get('binary_path','')}</td>"
         f"<td style='color:#94a3b8;font-size:11px;'>{e.get('pid','')}</td>"
