@@ -1,0 +1,14 @@
+{
+  "name": "shadowaisim-web-tests",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "test:unit": "vitest run",
+    "test:e2e": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.54.2",
+    "jsdom": "^24.1.1",
+    "vitest": "^2.1.9"
+  }
+}

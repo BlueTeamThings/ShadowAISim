@@ -68,6 +68,14 @@
         🚀 Full Audit
       </button>
       <button class="nav-item text-left px-5 py-2.5 text-sm font-medium rounded-lg mx-2 mb-0.5"
+          data-section="workflows" onclick="showSection('workflows')">
+        🧪 Workflow Builder
+      </button>
+      <button class="nav-item text-left px-5 py-2.5 text-sm font-medium rounded-lg mx-2 mb-0.5"
+          data-section="scenarios" onclick="showSection('scenarios')">
+        📚 Scenario Library
+      </button>
+      <button class="nav-item text-left px-5 py-2.5 text-sm font-medium rounded-lg mx-2 mb-0.5"
               data-section="reports" onclick="showSection('reports')">
         📄 Reports
       </button>
@@ -613,7 +621,7 @@
         <div id="section-audit" class="section">
           <h2 class="text-xl font-bold mb-1">Full Shadow AI Audit</h2>
           <p class="text-gray-400 text-sm mb-6">
-            Runs all three phases sequentially. Every action is timestamped so your security team can cross-reference against SIEM/DLP alerts to find gaps.
+            Runs all four core phases sequentially, with an optional fifth phase to execute queued Scenario Library packs. Every action is timestamped so your security team can cross-reference against SIEM/DLP alerts to find gaps.
           </p>
 
           <div class="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-8">
@@ -642,6 +650,11 @@
           <div class="bg-gray-900 border border-gray-800 rounded-xl p-6 mb-6">
             <div id="audit-idle" class="">
               <p class="text-gray-300 mb-4">Ready to run. The audit takes 3–10 minutes depending on network speed.</p>
+              <label class="inline-flex items-center gap-2 text-xs text-gray-400 mb-4 px-2 py-1.5 border border-gray-700 rounded bg-gray-950">
+                <input id="audit-include-scenarios" type="checkbox" class="accent-indigo-500" />
+                Include Scenario Queue as Phase 5
+              </label>
+              <p class="text-xs text-gray-500 mb-4">Phase 5 executes currently queued scenarios from Scenario Library after MCP steps finish.</p>
               <button id="audit-btn" onclick="startAudit()"
                 class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-8 py-3 rounded-lg text-sm transition-colors">
                 🚀 Start Full Shadow AI Audit
@@ -661,6 +674,303 @@
             <strong>⚠ Authorized Testing Only:</strong> Use this tool only on networks and systems you are authorized to test.
             All payloads are fake/simulated data. No real credentials are used. Intended for security team validation only.
           </div>
+        </div>
+
+        <!-- ════════════════════════════ WORKFLOW BUILDER ═══════════════════ -->
+        <div id="section-workflows" class="section">
+          <h2 class="text-xl font-bold mb-1">Workflow Builder</h2>
+          <p class="text-gray-400 text-sm mb-6">
+            Create reusable scenario workflows, execute them sequentially, and track each run with step-level results.
+          </p>
+
+          <div class="grid grid-cols-1 xl:grid-cols-3 gap-5">
+
+            <div class="xl:col-span-2 space-y-5">
+              <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
+                <div class="flex items-center justify-between gap-3 mb-4">
+                  <div>
+                    <h3 class="font-semibold text-gray-200">Saved Workflows</h3>
+                    <p class="text-xs text-gray-500 mt-0.5">Create, edit, duplicate, delete, and run one-by-one or as a selected batch.</p>
+                  </div>
+                  <div class="flex gap-2">
+                    <button onclick="workflowStartCreate()" class="card-btn text-xs bg-gray-800 hover:bg-gray-700 border border-gray-700 px-3 py-1.5 rounded-lg">New</button>
+                    <button onclick="workflowRunSelected()" class="card-btn text-xs bg-indigo-900 hover:bg-indigo-800 border border-indigo-700 px-3 py-1.5 rounded-lg text-indigo-200">Run Selected</button>
+                    <button onclick="workflowRefresh()" class="card-btn text-xs bg-gray-800 hover:bg-gray-700 border border-gray-700 px-3 py-1.5 rounded-lg">Refresh</button>
+                  </div>
+                </div>
+
+                <div class="overflow-x-auto">
+                  <table class="w-full text-left border-collapse">
+                    <thead>
+                      <tr class="text-[11px] text-gray-500 uppercase tracking-wide">
+                        <th class="px-3 py-2">Sel</th>
+                        <th class="px-3 py-2">Name</th>
+                        <th class="px-3 py-2">Description</th>
+                        <th class="px-3 py-2">Platform</th>
+                        <th class="px-3 py-2">Tags</th>
+                        <th class="px-3 py-2">Created</th>
+                        <th class="px-3 py-2">Last Run</th>
+                        <th class="px-3 py-2">Status</th>
+                        <th class="px-3 py-2">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody id="workflow-table-body"></tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
+                <h3 class="font-semibold text-gray-200 mb-3">Run Monitor</h3>
+                <div id="workflow-run-status" class="text-sm text-gray-500">No workflow run in progress.</div>
+              </div>
+
+              <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
+                <h3 class="font-semibold text-gray-200 mb-3">Run History</h3>
+                <div id="workflow-history" class="space-y-2"></div>
+              </div>
+            </div>
+
+            <div class="xl:col-span-1">
+              <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 sticky top-4">
+                <div class="flex items-center justify-between mb-4">
+                  <h3 id="workflow-editor-title" class="font-semibold text-gray-200">Create Workflow</h3>
+                  <span class="text-[11px] text-gray-500">id: <span id="workflow-editor-id">new</span></span>
+                </div>
+
+                <div class="space-y-3">
+                  <label class="block text-xs text-gray-400">
+                    Name
+                    <input id="workflow-name" type="text" oninput="workflowFieldChanged('name', this.value)" class="w-full bg-gray-950 border border-gray-700 rounded px-3 py-2 text-sm text-gray-100" />
+                  </label>
+
+                  <label class="block text-xs text-gray-400">
+                    Description
+                    <textarea id="workflow-description" rows="3" oninput="workflowFieldChanged('description', this.value)" class="w-full bg-gray-950 border border-gray-700 rounded px-3 py-2 text-sm text-gray-100"></textarea>
+                  </label>
+
+                  <div class="grid grid-cols-2 gap-2">
+                    <label class="block text-xs text-gray-400">
+                      Platform
+                      <select id="workflow-platform" onchange="workflowFieldChanged('platform', this.value)" class="w-full bg-gray-950 border border-gray-700 rounded px-3 py-2 text-sm text-gray-100">
+                        <option value="any">Any</option>
+                        <option value="linux">Linux</option>
+                        <option value="windows">Windows</option>
+                      </select>
+                    </label>
+
+                    <label class="flex items-center gap-2 text-xs text-gray-400 mt-6">
+                      <input id="workflow-enabled" type="checkbox" checked onchange="workflowFieldChanged('enabled', this.checked)" class="accent-indigo-500" /> Enabled
+                    </label>
+                  </div>
+
+                  <label class="block text-xs text-gray-400">
+                    Tags (comma separated)
+                    <input id="workflow-tags" type="text" oninput="workflowFieldChanged('tags', this.value)" class="w-full bg-gray-950 border border-gray-700 rounded px-3 py-2 text-sm text-gray-100" placeholder="vscode, copilot" />
+                  </label>
+
+                  <div class="flex items-center justify-between pt-2">
+                    <h4 class="text-sm font-semibold text-gray-300">Steps</h4>
+                    <button onclick="workflowAddStep()" class="text-xs bg-gray-800 hover:bg-gray-700 border border-gray-700 px-2 py-1 rounded">+ Add Step</button>
+                  </div>
+
+                  <div id="workflow-steps-host" class="space-y-2 max-h-[460px] overflow-y-auto pr-1"></div>
+
+                  <div id="workflow-form-error" class="hidden text-xs text-red-300 bg-red-950 border border-red-800 rounded px-3 py-2"></div>
+
+                  <div class="flex gap-2 pt-3 border-t border-gray-800">
+                    <button onclick="workflowSave()" class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold py-2 rounded-lg">Save Workflow</button>
+                    <button onclick="workflowStartCreate()" class="bg-gray-800 hover:bg-gray-700 border border-gray-700 text-sm px-3 rounded-lg">Reset</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- ═════════════════════════ Scenario Library ═════════════════════ -->
+        <div id="section-scenarios" class="section">
+          <h2 class="text-xl font-bold mb-1">Scenario Library</h2>
+          <p class="text-gray-400 text-sm mb-5">
+            Browse and manage structured shadow-AI scenarios by Category -> Family -> Scenario, then queue and execute them sequentially.
+          </p>
+
+          <div class="flex flex-wrap items-center gap-2 mb-5">
+            <select id="scenario-filter-platform" onchange="scenarioApplyFilters()" class="bg-gray-900 border border-gray-700 rounded px-2.5 py-1.5 text-xs text-gray-200">
+              <option value="any">Platform: Any</option>
+              <option value="linux">Platform: Linux</option>
+              <option value="windows">Platform: Windows</option>
+              <option value="darwin">Platform: macOS</option>
+            </select>
+            <label class="text-xs text-gray-400 flex items-center gap-1.5 px-2 py-1 border border-gray-700 rounded bg-gray-900">
+              <input id="scenario-filter-auth" type="checkbox" onchange="scenarioApplyFilters()" class="accent-indigo-500" /> Login needed
+            </label>
+            <label class="text-xs text-gray-400 flex items-center gap-1.5 px-2 py-1 border border-gray-700 rounded bg-gray-900">
+              <input id="scenario-filter-browser" type="checkbox" onchange="scenarioApplyFilters()" class="accent-indigo-500" /> Browser-only
+            </label>
+            <label class="text-xs text-gray-400 flex items-center gap-1.5 px-2 py-1 border border-gray-700 rounded bg-gray-900">
+              <input id="scenario-filter-desktop" type="checkbox" onchange="scenarioApplyFilters()" class="accent-indigo-500" /> Desktop-only
+            </label>
+            <label class="text-xs text-gray-400 flex items-center gap-1.5 px-2 py-1 border border-gray-700 rounded bg-gray-900">
+              <input id="scenario-filter-local" type="checkbox" onchange="scenarioApplyFilters()" class="accent-indigo-500" /> Local-only
+            </label>
+
+            <div class="ml-auto flex gap-2">
+              <button onclick="scenarioCreateNew()" class="text-xs bg-gray-800 hover:bg-gray-700 border border-gray-700 px-3 py-1.5 rounded-lg">Create</button>
+              <button onclick="scenarioDuplicateSelected()" class="text-xs bg-gray-800 hover:bg-gray-700 border border-gray-700 px-3 py-1.5 rounded-lg">Duplicate</button>
+              <button onclick="scenarioDeleteSelected()" class="text-xs bg-red-950 hover:bg-red-900 border border-red-800 text-red-300 px-3 py-1.5 rounded-lg">Delete</button>
+              <button onclick="scenarioQueueSelected()" class="text-xs bg-indigo-900 hover:bg-indigo-800 border border-indigo-700 text-indigo-200 px-3 py-1.5 rounded-lg">Queue</button>
+              <button onclick="scenarioRunSelected()" class="text-xs bg-emerald-900 hover:bg-emerald-800 border border-emerald-700 text-emerald-200 px-3 py-1.5 rounded-lg">Run</button>
+              <button onclick="scenarioExport()" class="text-xs bg-gray-800 hover:bg-gray-700 border border-gray-700 px-3 py-1.5 rounded-lg">Export</button>
+              <button onclick="scenarioTriggerImport()" class="text-xs bg-gray-800 hover:bg-gray-700 border border-gray-700 px-3 py-1.5 rounded-lg">Import</button>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 xl:grid-cols-12 gap-4">
+
+            <div class="xl:col-span-3 space-y-4">
+              <div class="bg-gray-900 border border-gray-800 rounded-xl p-3">
+                <div class="flex items-center justify-between mb-2">
+                  <h3 class="font-semibold text-sm text-gray-200">Category Tree</h3>
+                  <button onclick="scenarioRefresh()" class="text-[11px] text-gray-500 hover:text-gray-300">Refresh</button>
+                </div>
+                <div id="scenario-tree" class="max-h-[68vh] overflow-y-auto pr-1"></div>
+              </div>
+
+              <div class="bg-gray-900 border border-gray-800 rounded-xl p-3">
+                <h3 class="font-semibold text-sm text-gray-200 mb-2">Scenario Templates</h3>
+                <div id="scenario-template-list" class="space-y-2 max-h-52 overflow-y-auto pr-1"></div>
+              </div>
+            </div>
+
+            <div class="xl:col-span-5">
+              <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
+                <div class="flex items-center justify-between mb-3">
+                  <h3 class="font-semibold text-gray-200">Scenario Builder</h3>
+                  <span class="text-[11px] text-gray-500">id: <span id="scenario-editor-id">new</span></span>
+                </div>
+
+                <div class="space-y-3">
+                  <label class="block text-xs text-gray-400">
+                    Title
+                    <input id="scenario-title" type="text" class="w-full bg-gray-950 border border-gray-700 rounded px-3 py-2 text-sm text-gray-100" />
+                  </label>
+
+                  <label class="block text-xs text-gray-400">
+                    Description
+                    <textarea id="scenario-description" rows="3" class="w-full bg-gray-950 border border-gray-700 rounded px-3 py-2 text-sm text-gray-100"></textarea>
+                  </label>
+
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    <label class="block text-xs text-gray-400">
+                      Category
+                      <select id="scenario-category" class="w-full bg-gray-950 border border-gray-700 rounded px-3 py-2 text-sm text-gray-100">
+                        <option value="IDE Assistants">IDE Assistants</option>
+                      </select>
+                    </label>
+                    <label class="block text-xs text-gray-400">
+                      Family
+                      <input id="scenario-family" type="text" class="w-full bg-gray-950 border border-gray-700 rounded px-3 py-2 text-sm text-gray-100" />
+                    </label>
+                  </div>
+
+                  <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
+                    <label class="block text-xs text-gray-400">
+                      Risk Level
+                      <select id="scenario-risk" class="w-full bg-gray-950 border border-gray-700 rounded px-3 py-2 text-sm text-gray-100">
+                        <option value="low">Low</option>
+                        <option value="medium">Medium</option>
+                        <option value="high">High</option>
+                        <option value="critical">Critical</option>
+                      </select>
+                    </label>
+                    <label class="block text-xs text-gray-400">
+                      Platforms (comma-separated)
+                      <input id="scenario-platforms" type="text" class="w-full bg-gray-950 border border-gray-700 rounded px-3 py-2 text-sm text-gray-100" placeholder="linux, windows" />
+                    </label>
+                    <label class="flex items-center gap-2 text-xs text-gray-400 mt-6">
+                      <input id="scenario-auth-required" type="checkbox" class="accent-indigo-500" /> Auth required
+                    </label>
+                  </div>
+
+                  <label class="block text-xs text-gray-400">
+                    Tags (comma-separated)
+                    <input id="scenario-tags" type="text" class="w-full bg-gray-950 border border-gray-700 rounded px-3 py-2 text-sm text-gray-100" placeholder="browser, desktop, local" />
+                  </label>
+
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    <label class="block text-xs text-gray-400">
+                      Prerequisites (one per line)
+                      <textarea id="scenario-prerequisites" rows="3" class="w-full bg-gray-950 border border-gray-700 rounded px-3 py-2 text-xs text-gray-100"></textarea>
+                    </label>
+                    <label class="block text-xs text-gray-400">
+                      Assertions (one per line)
+                      <textarea id="scenario-assertions" rows="3" class="w-full bg-gray-950 border border-gray-700 rounded px-3 py-2 text-xs text-gray-100"></textarea>
+                    </label>
+                  </div>
+
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    <label class="block text-xs text-gray-400">
+                      Expected observables (one per line)
+                      <textarea id="scenario-observables" rows="3" class="w-full bg-gray-950 border border-gray-700 rounded px-3 py-2 text-xs text-gray-100"></textarea>
+                    </label>
+                    <label class="block text-xs text-gray-400">
+                      Detector expectations (one per line)
+                      <textarea id="scenario-detectors" rows="3" class="w-full bg-gray-950 border border-gray-700 rounded px-3 py-2 text-xs text-gray-100"></textarea>
+                    </label>
+                  </div>
+
+                  <label class="block text-xs text-gray-400">
+                    Cleanup steps (one per line)
+                    <textarea id="scenario-cleanup" rows="2" class="w-full bg-gray-950 border border-gray-700 rounded px-3 py-2 text-xs text-gray-100"></textarea>
+                  </label>
+
+                  <div class="flex items-center justify-between pt-1">
+                    <h4 class="text-sm font-semibold text-gray-300">Step Editor</h4>
+                    <button onclick="scenarioAddStep()" class="text-xs bg-gray-800 hover:bg-gray-700 border border-gray-700 px-2 py-1 rounded">+ Add Step</button>
+                  </div>
+
+                  <div id="scenario-steps-host" class="space-y-2 max-h-[420px] overflow-y-auto pr-1"></div>
+
+                  <div class="pt-3 border-t border-gray-800 flex gap-2">
+                    <button onclick="scenarioSave()" class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold py-2 rounded-lg">Save Scenario</button>
+                    <button onclick="scenarioCreateNew()" class="bg-gray-800 hover:bg-gray-700 border border-gray-700 text-sm px-3 rounded-lg">Reset</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="xl:col-span-4 space-y-4">
+              <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
+                <div class="flex items-center justify-between mb-3">
+                  <h3 class="font-semibold text-gray-200">Queue</h3>
+                  <div class="flex gap-2">
+                    <button onclick="scenarioRunQueue()" class="text-xs bg-emerald-900 hover:bg-emerald-800 border border-emerald-700 text-emerald-200 px-2.5 py-1 rounded">Run Queue</button>
+                    <button onclick="scenarioClearQueue()" class="text-xs bg-gray-800 hover:bg-gray-700 border border-gray-700 px-2.5 py-1 rounded">Clear</button>
+                  </div>
+                </div>
+                <div id="scenario-queue-list" class="space-y-2 max-h-56 overflow-y-auto pr-1"></div>
+              </div>
+
+              <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
+                <h3 class="font-semibold text-gray-200 mb-3">Live Run</h3>
+                <div id="scenario-run-status" class="text-sm text-gray-500">No scenario run in progress.</div>
+                <div id="scenario-manual-checkpoint" class="hidden mt-3 border border-amber-800 bg-amber-950/40 rounded-lg p-3"></div>
+              </div>
+
+              <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
+                <h3 class="font-semibold text-gray-200 mb-3">Run History</h3>
+                <div id="scenario-history" class="space-y-2 max-h-48 overflow-y-auto pr-1"></div>
+              </div>
+
+              <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
+                <h3 class="font-semibold text-gray-200 mb-3">Assertions Preview</h3>
+                <div id="scenario-assertion-preview" class="space-y-2"></div>
+              </div>
+            </div>
+          </div>
+
+          <input id="scenario-import-input" type="file" accept="application/json,.json" class="hidden" onchange="scenarioHandleImportFile(event)" />
         </div>
 
         <!-- ═══════════════════════════════ REPORTS ═════════════════════════ -->
@@ -892,5 +1202,9 @@
   </div>
 
   <script src="/static/app.js"></script>
+  <script src="/static/workflows_state.js"></script>
+  <script src="/static/scenarios_library.js"></script>
+  <script src="/static/workflows.js"></script>
+  <script src="/static/scenarios.js"></script>
 </body>
 </html>

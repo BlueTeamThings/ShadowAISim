@@ -30,6 +30,8 @@ All sensitive payloads are **fabricated** — fake PII, fake source code with fa
 | API Probing | Direct HTTP requests to OpenAI and Anthropic API endpoints; 401/403 responses correctly classified as expected auth failures |
 | App Installers | Cross-platform download and install of 26 AI applications; curl → wget → PowerShell → requests → urllib fallback chain |
 | MCP Server Installer | Installs MCP servers via npx/pip (EDR telemetry) and injects into `claude_desktop_config.json` (FIM testing) |
+| Scenario Library + Builder | Browse Category -> Family -> Scenario tree, filter, edit, duplicate, queue, import/export, and run scenarios sequentially |
+| Workflow Builder | Create reusable multi-step test case workflows, run sequentially, and track step-by-step history |
 | Full Audit Mode | Runs all 4 phases sequentially with real-time progress |
 | Dependency Health | Preflight check panel with one-click repair for missing tools (curl, Node.js, Chromium) |
 | Live Event Stream | SSE-powered terminal in the browser for real-time feedback |
@@ -134,13 +136,19 @@ ShadowAISim/
 │   │   ├── event_bus.py        # Async pub-sub for real-time SSE streaming
 │   │   ├── report_generator.py # JSON & HTML report generation
 │   │   ├── dep_bootstrap.py    # Dependency detection, download fallbacks, preflight
-│   │   └── launcher.py         # Headless-safe server launcher
+│   │   ├── launcher.py         # Headless-safe server launcher
+│   │   ├── workflow_definitions.py # Step schema + built-in sample workflows
+│   │   ├── workflow_store.py   # JSON-backed workflow persistence + run history
+│   │   ├── scenario_definitions.py # Scenario schema, hierarchy, templates, starter pack
+│   │   └── scenario_store.py   # JSON-backed scenario library persistence + import/export
 │   ├── routes/                 # FastAPI route handlers
 │   │   ├── stream.py           # SSE endpoint
 │   │   ├── web_leakage.py      # Browser simulation routes
 │   │   ├── api_probe.py        # API probing routes
 │   │   ├── installers.py       # App installer routes
 │   │   ├── mcp_servers.py      # MCP server simulation routes
+│   │   ├── workflows.py        # Workflow CRUD + run orchestration routes
+│   │   ├── scenarios.py        # Scenario library CRUD + queue + execution routes
 │   │   ├── audit.py            # Full audit orchestration (4 phases)
 │   │   ├── reports.py          # Report download endpoints
 │   │   └── preflight.py        # Dependency health check & repair endpoints
@@ -148,7 +156,9 @@ ShadowAISim/
 │       ├── browser.py          # Playwright async browser automation
 │       ├── api_calls.py        # HTTPX async API requests
 │       ├── installers.py       # Cross-platform installer execution
-│       └── mcp_servers.py      # MCP server install + config injection
+│       ├── mcp_servers.py      # MCP server install + config injection
+│       ├── workflow_runner.py  # Sequential workflow execution engine
+│       └── scenario_runner.py  # Scenario queue runner + manual checkpoint engine
 │
 ├── tests/
 │   ├── test_browser_preflight.py   # Browser/Playwright preflight tests
@@ -158,7 +168,9 @@ ShadowAISim/
 │
 └── static/
     ├── index.html              # Single-page frontend (Tailwind CSS)
-    └── app.js                  # SSE client, state management, preflight UI
+    ├── app.js                  # SSE client, state management, preflight UI
+    ├── workflows.js            # Workflow Builder page UI + editor logic
+    └── scenarios.js            # Scenario Library page UI + queue/editor logic
 ```
 
 **Stack:** FastAPI · Uvicorn · Playwright (Async API) · HTTPX · Tailwind CSS · Vanilla JS · SSE
@@ -183,6 +195,36 @@ ShadowAISim/
 | `GET` | `/api/mcp/servers` | List MCP servers |
 | `POST` | `/api/mcp/{server_id}` | Install single MCP server |
 | `POST` | `/api/mcp/all` | Install all MCP servers |
+| `GET` | `/api/workflows` | List workflows |
+| `POST` | `/api/workflows` | Create workflow |
+| `GET` | `/api/workflows/{id}` | Get workflow details |
+| `PUT` | `/api/workflows/{id}` | Update workflow |
+| `DELETE` | `/api/workflows/{id}` | Delete workflow |
+| `POST` | `/api/workflows/{id}/duplicate` | Duplicate workflow |
+| `POST` | `/api/workflows/run/{id}` | Run one workflow |
+| `POST` | `/api/workflows/run-selected` | Run selected workflows sequentially |
+| `GET` | `/api/workflows/run/status` | Get active workflow run status |
+| `GET` | `/api/workflows/runs` | Get workflow run history |
+| `GET` | `/api/workflows/meta` | Get step schema, app list, platform metadata |
+| `GET` | `/api/scenarios` | List scenarios (supports platform/auth/mode filters) |
+| `GET` | `/api/scenarios/tree` | Get Category -> Family -> Scenario hierarchy tree |
+| `POST` | `/api/scenarios` | Create scenario |
+| `GET` | `/api/scenarios/{id}` | Get scenario details |
+| `PUT` | `/api/scenarios/{id}` | Update scenario |
+| `DELETE` | `/api/scenarios/{id}` | Delete scenario |
+| `POST` | `/api/scenarios/{id}/duplicate` | Duplicate scenario |
+| `POST` | `/api/scenarios/queue/{id}` | Add scenario to execution queue |
+| `DELETE` | `/api/scenarios/queue/{id}` | Remove scenario from queue |
+| `POST` | `/api/scenarios/queue/clear` | Clear queue |
+| `POST` | `/api/scenarios/queue/run` | Run queued scenarios sequentially |
+| `POST` | `/api/scenarios/run/{id}` | Run one scenario |
+| `POST` | `/api/scenarios/run-selected` | Run provided scenario list sequentially |
+| `POST` | `/api/scenarios/run/resume` | Resume a paused manual checkpoint step |
+| `GET` | `/api/scenarios/run/status` | Get active scenario run + checkpoint state |
+| `GET` | `/api/scenarios/runs` | Get scenario run history |
+| `GET` | `/api/scenarios/meta` | Get scenario schema, categories, templates |
+| `GET` | `/api/scenarios/export` | Export full scenario library JSON |
+| `POST` | `/api/scenarios/import` | Import scenarios (`merge` or `replace`) |
 | `POST` | `/api/audit/start` | Start full 4-phase audit |
 | `GET` | `/api/audit/status` | Get current audit status |
 | `GET` | `/api/reports/json` | Download JSON report |
@@ -255,6 +297,29 @@ All automation emits structured events via an async pub-sub bus. Events include 
 
 ### Dependency Health
 The **Dep Health** panel (accessible from the nav bar) runs a preflight check on startup and shows the status of each required tool: Python, curl, Node.js, npm, npx, and Chromium. Repair buttons install missing components without leaving the UI.
+
+### Workflow Builder
+The **Workflow Builder** page adds reusable scenario orchestration with:
+
+- Workflow list with create, edit, duplicate, delete, run, and run-selected actions
+- Step-by-step editor supporting typed steps (install app, install extension, launch app, website actions, assertions, screenshot, close app)
+- Sequential workflow execution engine with structured per-step pass/fail outcomes
+- Run monitor panel showing current workflow, current step, elapsed time, and recent logs
+- Durable JSON storage in `simulator_data/workflows/workflows.json`
+- Run history in `simulator_data/workflows/run_history.json`
+- Built-in sample workflows: VS Code + Copilot, browser AI visit, and Ollama local prompt
+
+### Scenario Library + Scenario Builder
+The **Scenario Library** adds a structured test-catalog model:
+
+- Ordered hierarchy: `Category -> Family -> Scenario`
+- Required scenario fields: id/title/description/category/family/tags/risk/platform/auth/prerequisites/steps/assertions/observables/detector expectations/cleanup
+- Built-in starter scenarios across IDE assistants, browser AI services, local models, MCP connectors, file transfer simulations, and cross-app chains
+- Built-in scenario templates for installation footprint, pre-auth and post-auth behavior, file upload, copy/paste exfil, MCP connector tests, cross-app workflow chains, and local-model-only runs
+- Three-pane UI: tree browser (left), scenario builder + step editor (center), queue/live logs/history/assertions (right)
+- Queue-first execution with sequential runs, per-step pass/fail logs, screenshot capture, and run history
+- Manual checkpoint steps that pause for login/MFA tasks and resume via API/UI
+- Capability-check steps for gated features (for example Google AI Mode)
 
 ---
 

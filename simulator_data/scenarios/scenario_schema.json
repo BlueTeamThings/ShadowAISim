@@ -1,0 +1,528 @@
+{
+  "scenario_fields": [
+    "id",
+    "title",
+    "description",
+    "category",
+    "family",
+    "tags",
+    "risk_level",
+    "platforms",
+    "auth_required",
+    "prerequisites",
+    "steps",
+    "assertions",
+    "expected_observables",
+    "detector_expectations",
+    "cleanup_steps",
+    "created_date",
+    "last_run_date",
+    "status",
+    "metadata"
+  ],
+  "categories": [
+    "IDE Assistants",
+    "Desktop AI Apps",
+    "Browser AI Services",
+    "Search-Integrated AI",
+    "Local Model Tools",
+    "Agent + MCP Workflows",
+    "File/Data Transfer Simulations",
+    "Cross-App Chained Workflows"
+  ],
+  "risk_levels": [
+    "critical",
+    "high",
+    "low",
+    "medium"
+  ],
+  "step_types": [
+    {
+      "type": "install_application",
+      "label": "Install application",
+      "description": "Install an app by catalog id or display name.",
+      "os_support": [
+        "linux",
+        "windows",
+        "darwin"
+      ],
+      "fields": [
+        {
+          "name": "app_name",
+          "label": "Application",
+          "input": "text",
+          "required": true,
+          "placeholder": "vscode, ollama"
+        }
+      ]
+    },
+    {
+      "type": "install_browser_extension",
+      "label": "Install extension",
+      "description": "Install extension for a target app (for example VS Code).",
+      "os_support": [
+        "linux",
+        "windows",
+        "darwin"
+      ],
+      "fields": [
+        {
+          "name": "target_app",
+          "label": "Target app",
+          "input": "text",
+          "required": true,
+          "placeholder": "vscode"
+        },
+        {
+          "name": "extension_id",
+          "label": "Extension id",
+          "input": "text",
+          "required": true,
+          "placeholder": "GitHub.copilot"
+        }
+      ]
+    },
+    {
+      "type": "launch_application",
+      "label": "Launch application",
+      "description": "Launch installed application.",
+      "os_support": [
+        "linux",
+        "windows",
+        "darwin"
+      ],
+      "fields": [
+        {
+          "name": "app_name",
+          "label": "Application",
+          "input": "text",
+          "required": true,
+          "placeholder": "vscode, ollama"
+        }
+      ]
+    },
+    {
+      "type": "open_website",
+      "label": "Open website",
+      "description": "Open URL in Playwright browser context.",
+      "os_support": [
+        "linux",
+        "windows",
+        "darwin"
+      ],
+      "fields": [
+        {
+          "name": "url",
+          "label": "URL",
+          "input": "text",
+          "required": true,
+          "placeholder": "https://chatgpt.com"
+        },
+        {
+          "name": "requires_capability",
+          "label": "Requires capability",
+          "input": "text",
+          "required": false,
+          "placeholder": "google_ai_mode"
+        }
+      ]
+    },
+    {
+      "type": "click_selector",
+      "label": "Click selector",
+      "description": "Click CSS selector on active page.",
+      "os_support": [
+        "linux",
+        "windows",
+        "darwin"
+      ],
+      "fields": [
+        {
+          "name": "selector",
+          "label": "CSS selector",
+          "input": "text",
+          "required": true,
+          "placeholder": "textarea"
+        }
+      ]
+    },
+    {
+      "type": "type_text",
+      "label": "Type text",
+      "description": "Type text into active browser page or desktop input.",
+      "os_support": [
+        "linux",
+        "windows",
+        "darwin"
+      ],
+      "fields": [
+        {
+          "name": "text",
+          "label": "Text",
+          "input": "textarea",
+          "required": true
+        }
+      ]
+    },
+    {
+      "type": "press_shortcut",
+      "label": "Press shortcut",
+      "description": "Send keyboard shortcut.",
+      "os_support": [
+        "linux",
+        "windows",
+        "darwin"
+      ],
+      "fields": [
+        {
+          "name": "keys",
+          "label": "Shortcut",
+          "input": "text",
+          "required": true,
+          "placeholder": "ctrl+v"
+        }
+      ]
+    },
+    {
+      "type": "upload_file",
+      "label": "Upload file",
+      "description": "Upload sample file in browser file input.",
+      "os_support": [
+        "linux",
+        "windows",
+        "darwin"
+      ],
+      "fields": [
+        {
+          "name": "selector",
+          "label": "File input selector",
+          "input": "text",
+          "required": true,
+          "placeholder": "input[type=file]"
+        },
+        {
+          "name": "path",
+          "label": "File path",
+          "input": "text",
+          "required": true,
+          "placeholder": "simulator_data/scenarios/samples/sample_brief.txt"
+        }
+      ]
+    },
+    {
+      "type": "copy_text",
+      "label": "Copy text",
+      "description": "Copy explicit text or text from selector into simulated clipboard.",
+      "os_support": [
+        "linux",
+        "windows",
+        "darwin"
+      ],
+      "fields": [
+        {
+          "name": "text",
+          "label": "Static text",
+          "input": "textarea",
+          "required": false
+        },
+        {
+          "name": "selector",
+          "label": "Source selector",
+          "input": "text",
+          "required": false
+        }
+      ]
+    },
+    {
+      "type": "paste_text",
+      "label": "Paste text",
+      "description": "Paste simulated clipboard into selector or active input.",
+      "os_support": [
+        "linux",
+        "windows",
+        "darwin"
+      ],
+      "fields": [
+        {
+          "name": "selector",
+          "label": "Target selector",
+          "input": "text",
+          "required": false,
+          "placeholder": "textarea"
+        },
+        {
+          "name": "text",
+          "label": "Override text",
+          "input": "textarea",
+          "required": false
+        }
+      ]
+    },
+    {
+      "type": "manual_checkpoint",
+      "label": "Manual checkpoint",
+      "description": "Pause run for analyst action (for example login or MFA).",
+      "os_support": [
+        "linux",
+        "windows",
+        "darwin"
+      ],
+      "fields": [
+        {
+          "name": "instruction",
+          "label": "Instruction",
+          "input": "textarea",
+          "required": true
+        },
+        {
+          "name": "timeout_seconds",
+          "label": "Timeout seconds",
+          "input": "number",
+          "required": false,
+          "default": 900
+        },
+        {
+          "name": "auto_continue",
+          "label": "Auto-continue",
+          "input": "checkbox",
+          "required": false,
+          "default": false
+        }
+      ]
+    },
+    {
+      "type": "capability_check",
+      "label": "Capability check",
+      "description": "Gate scenario branch on environment capability.",
+      "os_support": [
+        "linux",
+        "windows",
+        "darwin"
+      ],
+      "fields": [
+        {
+          "name": "capability",
+          "label": "Capability name",
+          "input": "text",
+          "required": true,
+          "placeholder": "google_ai_mode"
+        },
+        {
+          "name": "fail_if_missing",
+          "label": "Fail if missing",
+          "input": "checkbox",
+          "required": false,
+          "default": false
+        }
+      ]
+    },
+    {
+      "type": "mcp_install_server",
+      "label": "Install MCP server",
+      "description": "Install MCP server package.",
+      "os_support": [
+        "linux",
+        "windows",
+        "darwin"
+      ],
+      "fields": [
+        {
+          "name": "server_id",
+          "label": "Server id",
+          "input": "text",
+          "required": true,
+          "placeholder": "filesystem"
+        }
+      ]
+    },
+    {
+      "type": "mcp_inject_config",
+      "label": "Inject MCP config",
+      "description": "Inject MCP server config into supported AI client config.",
+      "os_support": [
+        "linux",
+        "windows",
+        "darwin"
+      ],
+      "fields": [
+        {
+          "name": "server_ids",
+          "label": "Server ids (comma separated)",
+          "input": "text",
+          "required": true,
+          "placeholder": "filesystem,postgres"
+        }
+      ]
+    },
+    {
+      "type": "pull_local_model",
+      "label": "Pull local model",
+      "description": "Pull local model via Ollama.",
+      "os_support": [
+        "linux",
+        "windows",
+        "darwin"
+      ],
+      "fields": [
+        {
+          "name": "model",
+          "label": "Model",
+          "input": "text",
+          "required": true,
+          "placeholder": "llama3.2:1b"
+        }
+      ]
+    },
+    {
+      "type": "assert_text_contains",
+      "label": "Assert text contains",
+      "description": "Assert page body contains expected substring.",
+      "os_support": [
+        "linux",
+        "windows",
+        "darwin"
+      ],
+      "fields": [
+        {
+          "name": "expected",
+          "label": "Expected text",
+          "input": "text",
+          "required": true
+        }
+      ]
+    },
+    {
+      "type": "assert_clipboard_contains",
+      "label": "Assert clipboard contains",
+      "description": "Assert clipboard text contains expected value.",
+      "os_support": [
+        "linux",
+        "windows",
+        "darwin"
+      ],
+      "fields": [
+        {
+          "name": "expected",
+          "label": "Expected text",
+          "input": "text",
+          "required": true
+        }
+      ]
+    },
+    {
+      "type": "capture_screenshot",
+      "label": "Capture screenshot",
+      "description": "Capture browser screenshot for evidence.",
+      "os_support": [
+        "linux",
+        "windows",
+        "darwin"
+      ],
+      "fields": [
+        {
+          "name": "path",
+          "label": "Output path",
+          "input": "text",
+          "required": false,
+          "placeholder": "simulator_data/scenarios/screenshots/scn.png"
+        }
+      ]
+    },
+    {
+      "type": "wait",
+      "label": "Wait",
+      "description": "Wait before next step.",
+      "os_support": [
+        "linux",
+        "windows",
+        "darwin"
+      ],
+      "fields": [
+        {
+          "name": "seconds",
+          "label": "Seconds",
+          "input": "number",
+          "required": true,
+          "default": 2
+        }
+      ]
+    },
+    {
+      "type": "close_application",
+      "label": "Close application",
+      "description": "Close managed process or app.",
+      "os_support": [
+        "linux",
+        "windows",
+        "darwin"
+      ],
+      "fields": [
+        {
+          "name": "app_name",
+          "label": "Application",
+          "input": "text",
+          "required": true,
+          "placeholder": "vscode, ollama"
+        }
+      ]
+    }
+  ],
+  "templates": [
+    {
+      "template_id": "template-installation-footprint",
+      "title": "Installation footprint test",
+      "description": "Validate installer telemetry and artifact placement.",
+      "recommended_category": "Desktop AI Apps",
+      "recommended_family": "Installation Footprint"
+    },
+    {
+      "template_id": "template-pre-auth-use",
+      "title": "Pre-auth use test",
+      "description": "Exercise prompt surfaces before account sign-in.",
+      "recommended_category": "IDE Assistants",
+      "recommended_family": "Pre-Auth Prompting"
+    },
+    {
+      "template_id": "template-post-auth-use",
+      "title": "Post-auth use test",
+      "description": "Resume execution after login checkpoint and verify tool usage.",
+      "recommended_category": "Desktop AI Apps",
+      "recommended_family": "Post-Auth Prompting"
+    },
+    {
+      "template_id": "template-file-upload",
+      "title": "File upload test",
+      "description": "Upload sample text/csv/pdf and request summary.",
+      "recommended_category": "File/Data Transfer Simulations",
+      "recommended_family": "Upload + Summary"
+    },
+    {
+      "template_id": "template-copy-paste-exfil",
+      "title": "Copy/paste exfil simulation test",
+      "description": "Copy generated output from one app and paste into another app.",
+      "recommended_category": "Cross-App Chained Workflows",
+      "recommended_family": "Clipboard Relay"
+    },
+    {
+      "template_id": "template-mcp-connector",
+      "title": "MCP/tool connector test",
+      "description": "Install MCP package, inject config, and verify manual interaction checkpoint.",
+      "recommended_category": "Agent + MCP Workflows",
+      "recommended_family": "Connector Provisioning"
+    },
+    {
+      "template_id": "template-cross-app-chain",
+      "title": "Multi-step cross-app workflow",
+      "description": "Chain browser, desktop assistant, and IDE operations in sequence.",
+      "recommended_category": "Cross-App Chained Workflows",
+      "recommended_family": "Cross-App Relay"
+    },
+    {
+      "template_id": "template-local-model-only",
+      "title": "Local-model-only workflow",
+      "description": "Install local runtime, pull model, prompt locally, collect observables.",
+      "recommended_category": "Local Model Tools",
+      "recommended_family": "Offline Local Prompting"
+    }
+  ]
+}

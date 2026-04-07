@@ -1,0 +1,4 @@
+employee_id,region,quota,status
+E-102,EMEA,420000,active
+E-301,NA,610000,active
+E-998,APAC,380000,leave

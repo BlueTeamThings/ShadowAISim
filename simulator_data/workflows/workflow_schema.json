@@ -1,0 +1,168 @@
+{
+  "workflow_fields": [
+    "id",
+    "name",
+    "description",
+    "platform",
+    "enabled",
+    "tags",
+    "steps",
+    "assertions",
+    "metadata",
+    "created_date",
+    "last_run_date",
+    "status"
+  ],
+  "step_types": [
+    {
+      "type": "install_application",
+      "label": "Install application",
+      "fields": [
+        {
+          "name": "app_name",
+          "label": "Application",
+          "input": "text",
+          "required": true
+        }
+      ]
+    },
+    {
+      "type": "install_browser_extension",
+      "label": "Install browser extension",
+      "fields": [
+        {
+          "name": "target_app",
+          "label": "Target app",
+          "input": "text",
+          "required": true
+        },
+        {
+          "name": "extension_id",
+          "label": "Extension id",
+          "input": "text",
+          "required": true
+        }
+      ]
+    },
+    {
+      "type": "launch_application",
+      "label": "Launch application",
+      "fields": [
+        {
+          "name": "app_name",
+          "label": "Application",
+          "input": "text",
+          "required": true
+        }
+      ]
+    },
+    {
+      "type": "open_website",
+      "label": "Open website",
+      "fields": [
+        {
+          "name": "url",
+          "label": "URL",
+          "input": "text",
+          "required": true
+        }
+      ]
+    },
+    {
+      "type": "wait",
+      "label": "Wait/delay",
+      "fields": [
+        {
+          "name": "seconds",
+          "label": "Seconds",
+          "input": "number",
+          "required": true
+        }
+      ]
+    },
+    {
+      "type": "type_text",
+      "label": "Type text",
+      "fields": [
+        {
+          "name": "text",
+          "label": "Text",
+          "input": "textarea",
+          "required": true
+        }
+      ]
+    },
+    {
+      "type": "press_shortcut",
+      "label": "Press shortcut",
+      "fields": [
+        {
+          "name": "keys",
+          "label": "Shortcut",
+          "input": "text",
+          "required": true
+        }
+      ]
+    },
+    {
+      "type": "click_selector",
+      "label": "Click selector",
+      "fields": [
+        {
+          "name": "selector",
+          "label": "CSS selector",
+          "input": "text",
+          "required": true
+        }
+      ]
+    },
+    {
+      "type": "assert_text_contains",
+      "label": "Assert text contains",
+      "fields": [
+        {
+          "name": "expected",
+          "label": "Expected text",
+          "input": "text",
+          "required": true
+        }
+      ]
+    },
+    {
+      "type": "assert_clipboard_contains",
+      "label": "Assert clipboard contains",
+      "fields": [
+        {
+          "name": "expected",
+          "label": "Expected text",
+          "input": "text",
+          "required": true
+        }
+      ]
+    },
+    {
+      "type": "capture_screenshot",
+      "label": "Capture screenshot",
+      "fields": [
+        {
+          "name": "path",
+          "label": "Output path",
+          "input": "text",
+          "required": false
+        }
+      ]
+    },
+    {
+      "type": "close_application",
+      "label": "Close application",
+      "fields": [
+        {
+          "name": "app_name",
+          "label": "Application",
+          "input": "text",
+          "required": true
+        }
+      ]
+    }
+  ]
+}

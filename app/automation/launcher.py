@@ -196,32 +196,122 @@ async def start_app(app: dict, emit: Emitter) -> dict:
         }
 
 
-async def stop_app(app_id: str, emit: Emitter) -> dict:
-    proc = _PROCESSES.get(app_id)
-    if not proc or proc.returncode is not None:
+async def _run_stop_command(cmd: list[str]) -> tuple[int, str]:
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+    except FileNotFoundError:
+        return 127, f"Command not found: {cmd[0]}"
+
+    out, err = await proc.communicate()
+    output = "\n".join(
+        part for part in [
+            (out or b"").decode(errors="replace").strip(),
+            (err or b"").decode(errors="replace").strip(),
+        ]
+        if part
+    )
+    return proc.returncode, output
+
+
+def _looks_like_missing_process(output: str) -> bool:
+    lowered = output.lower()
+    hints = (
+        "no process found",
+        "not running",
+        "not found",
+        "not loaded",
+        "could not be found",
+        "no such process",
+        "no running instance",
+    )
+    return any(hint in lowered for hint in hints)
+
+
+async def _stop_ollama_external(emit: Emitter) -> dict:
+    system = _platform_key()
+    commands: list[list[str]] = []
+
+    if system == "windows":
+        if shutil.which("taskkill"):
+            commands.append(["taskkill", "/F", "/IM", "ollama.exe", "/T"])
+    else:
+        if shutil.which("systemctl"):
+            if hasattr(os, "geteuid") and os.geteuid() != 0 and shutil.which("sudo"):
+                commands.append(["sudo", "-n", "systemctl", "stop", "ollama"])
+            commands.append(["systemctl", "stop", "ollama"])
+        if shutil.which("pkill"):
+            commands.append(["pkill", "-f", "ollama"])
+
+    saw_not_running = False
+    details: list[dict] = []
+
+    for cmd in commands:
+        rc, output = await _run_stop_command(cmd)
+        details.append({"command": " ".join(cmd), "return_code": rc, "output": output[:300]})
+        if rc == 0:
+            await emit("INFO", "APP", "ollama: daemon stop command succeeded", "ollama", classification="PROCESS_STOPPED")
+            return {
+                "app_id": "ollama",
+                "stopped": True,
+                "classification": "PROCESS_STOPPED",
+                "message": "Ollama daemon stopped",
+                "attempts": details,
+            }
+
+        if (cmd and cmd[0] == "pkill" and rc == 1) or _looks_like_missing_process(output):
+            saw_not_running = True
+
+    if saw_not_running:
         return {
-            "app_id": app_id,
-            "stopped": False,
-            "classification": "NOT_RUNNING",
-            "message": "Process not running",
+            "app_id": "ollama",
+            "stopped": True,
+            "classification": "NOT_RUNNING_IGNORED",
+            "message": "Ollama daemon was not running",
+            "attempts": details,
         }
 
-    proc.terminate()
-    try:
-        await asyncio.wait_for(proc.wait(), timeout=10)
-    except asyncio.TimeoutError:
-        proc.kill()
-        await proc.wait()
+    return {
+        "app_id": "ollama",
+        "stopped": False,
+        "classification": "NOT_RUNNING",
+        "message": "Process not running",
+        "attempts": details,
+    }
 
-    meta = _PROCESS_META.get(app_id)
-    if meta:
-        meta.status = "stopped"
-    await emit("INFO", "APP", f"{app_id}: process stopped", app_id, classification="PROCESS_STOPPED")
+
+async def stop_app(app_id: str, emit: Emitter) -> dict:
+    proc = _PROCESSES.get(app_id)
+    if proc and proc.returncode is None:
+        proc.terminate()
+        try:
+            await asyncio.wait_for(proc.wait(), timeout=10)
+        except asyncio.TimeoutError:
+            proc.kill()
+            await proc.wait()
+
+        meta = _PROCESS_META.get(app_id)
+        if meta:
+            meta.status = "stopped"
+        await emit("INFO", "APP", f"{app_id}: process stopped", app_id, classification="PROCESS_STOPPED")
+        return {
+            "app_id": app_id,
+            "stopped": True,
+            "classification": "PROCESS_STOPPED",
+            "message": "Process stopped",
+        }
+
+    if app_id in {"ollama", "ollama_service"}:
+        return await _stop_ollama_external(emit)
+
     return {
         "app_id": app_id,
-        "stopped": True,
-        "classification": "PROCESS_STOPPED",
-        "message": "Process stopped",
+        "stopped": False,
+        "classification": "NOT_RUNNING",
+        "message": "Process not running",
     }
 
 

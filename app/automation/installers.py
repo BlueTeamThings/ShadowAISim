@@ -28,6 +28,14 @@ PLATFORM_KEY = {"Linux": "linux", "Darwin": "darwin", "Windows": "windows"}.get(
 ARCH_KEY = "arm64" if platform.machine().lower() in ("aarch64", "arm64") else "x64"
 _CHUNK = 65_536
 
+DOWNLOAD_HTTP_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Accept": "application/octet-stream, application/x-msdownload, */*",
+    "Accept-Encoding": "gzip, deflate, br",
+}
+
+ANTI_BOT_PAYLOAD_ERROR = "Installer Error: CDN Anti-bot triggered. Received HTML instead of executable binary."
+
 STATUS = {
     "INSTALLED_OK": "INSTALLED_OK",
     "ALREADY_INSTALLED": "ALREADY_INSTALLED",
@@ -126,6 +134,164 @@ _SUFFIX = {
 }
 
 
+PACKAGE_MANAGER_STRATEGIES: dict[str, dict[str, dict]] = {
+    "vscode": {
+        "windows": {
+            "commands": [
+                {
+                    "command": [
+                        "winget",
+                        "install",
+                        "--id",
+                        "Microsoft.VisualStudioCode",
+                        "--exact",
+                        "--silent",
+                        "--accept-package-agreements",
+                        "--accept-source-agreements",
+                    ],
+                },
+            ],
+            "fallback_to_download": False,
+        },
+        "linux": {
+            "commands": [
+                {
+                    "command": ["snap", "install", "--classic", "code"],
+                    "privileged": True,
+                },
+                {
+                    "command": ["apt-get", "install", "code", "-y"],
+                    "privileged": True,
+                },
+            ],
+            "fallback_to_download": False,
+        },
+    },
+    "cursor": {
+        "windows": {
+            "commands": [
+                {
+                    "command": [
+                        "winget",
+                        "install",
+                        "--id",
+                        "Cursor.Cursor",
+                        "--exact",
+                        "--silent",
+                        "--accept-package-agreements",
+                        "--accept-source-agreements",
+                    ],
+                },
+            ],
+            "fallback_to_download": False,
+        },
+        "linux": {
+            "commands": [],
+            "fallback_to_download": True,
+        },
+    },
+    "zed": {
+        "windows": {
+            "commands": [
+                {
+                    "command": [
+                        "winget",
+                        "install",
+                        "--id",
+                        "Zed.Zed",
+                        "--exact",
+                        "--silent",
+                        "--accept-package-agreements",
+                        "--accept-source-agreements",
+                    ],
+                },
+            ],
+            "fallback_to_download": False,
+        },
+        "linux": {
+            "commands": [
+                {
+                    "command": ["sh", "-c", "curl -f https://zed.dev/install.sh | sh"],
+                },
+            ],
+            "fallback_to_download": False,
+        },
+    },
+    "ollama": {
+        "windows": {
+            "commands": [
+                {
+                    "command": [
+                        "winget",
+                        "install",
+                        "--id",
+                        "Ollama.Ollama",
+                        "--exact",
+                        "--silent",
+                        "--accept-package-agreements",
+                        "--accept-source-agreements",
+                    ],
+                },
+            ],
+            "fallback_to_download": False,
+        },
+        "linux": {
+            "commands": [
+                {
+                    "command": ["sh", "-c", "curl -fsSL https://ollama.com/install.sh | sh"],
+                },
+            ],
+            "fallback_to_download": False,
+        },
+    },
+    "claude_desktop": {
+        "windows": {
+            "commands": [
+                {
+                    "command": [
+                        "winget",
+                        "install",
+                        "--id",
+                        "Anthropic.Claude",
+                        "--exact",
+                        "--silent",
+                        "--accept-package-agreements",
+                    ],
+                },
+            ],
+            "fallback_to_download": False,
+        },
+    },
+    "brave": {
+        "windows": {
+            "commands": [
+                {
+                    "command": [
+                        "winget",
+                        "install",
+                        "--id",
+                        "Brave.Brave",
+                        "--exact",
+                        "--silent",
+                        "--accept-package-agreements",
+                    ],
+                },
+            ],
+            "fallback_to_download": False,
+        },
+        "linux": {
+            "commands": [
+                {
+                    "command": ["snap", "install", "brave"],
+                    "privileged": True,
+                },
+            ],
+            "fallback_to_download": False,
+        },
+    },
+}
+
+
 def _normalize(installer: dict) -> dict:
     if "app_id" in installer:
         return dict(installer)
@@ -165,6 +331,32 @@ def _normalize(installer: dict) -> dict:
         "requires_service": False,
         "requires_elevated_permissions": False,
     }
+
+
+def _linux_privileged_cmds(base_cmd: list[str]) -> list[list[str]]:
+    if SYSTEM != "Linux":
+        return [base_cmd]
+
+    if hasattr(os, "geteuid") and os.geteuid() == 0:
+        return [base_cmd]
+
+    variants: list[list[str]] = []
+    if shutil.which("sudo"):
+        variants.append(["sudo", "-n", *base_cmd])
+    variants.append(base_cmd)
+    return variants
+
+
+def _package_manager_strategy(app: dict) -> dict | None:
+    app_id = app.get("app_id", "")
+    return (PACKAGE_MANAGER_STRATEGIES.get(app_id) or {}).get(PLATFORM_KEY)
+
+
+def _supports_download_fallback(app: dict) -> bool:
+    strategy = _package_manager_strategy(app)
+    if not strategy:
+        return True
+    return bool(strategy.get("fallback_to_download", False))
 
 
 def _status_from_http(status_code: int) -> str:
@@ -324,7 +516,7 @@ async def _resolve_github_asset(app: dict, platform_key: str, arch_key: str) -> 
         }
 
     api_url = f"https://api.github.com/repos/{repo}/releases/latest"
-    async with httpx.AsyncClient(timeout=20.0, follow_redirects=True) as client:
+    async with httpx.AsyncClient(timeout=20.0, follow_redirects=True, headers=DOWNLOAD_HTTP_HEADERS) as client:
         resp = await client.get(api_url)
     if resp.status_code != 200:
         return {
@@ -374,11 +566,13 @@ async def _resolve_github_asset(app: dict, platform_key: str, arch_key: str) -> 
 
 async def _head_validate(url: str) -> dict:
     try:
-        async with httpx.AsyncClient(timeout=20.0, follow_redirects=True) as client:
+        async with httpx.AsyncClient(timeout=20.0, follow_redirects=True, headers=DOWNLOAD_HTTP_HEADERS) as client:
             resp = await client.head(url)
         if resp.status_code in (405,):
-            async with httpx.AsyncClient(timeout=20.0, follow_redirects=True) as client:
-                resp = await client.get(url, headers={"Range": "bytes=0-0"})
+            range_headers = dict(DOWNLOAD_HTTP_HEADERS)
+            range_headers["Range"] = "bytes=0-0"
+            async with httpx.AsyncClient(timeout=20.0, follow_redirects=True, headers=DOWNLOAD_HTTP_HEADERS) as client:
+                resp = await client.get(url, headers=range_headers)
 
         final_url = str(resp.url)
         if _is_release_page_url(final_url):
@@ -421,7 +615,7 @@ async def _resolve_lmstudio_linux_asset(app: dict) -> dict:
     pattern = re.compile(r"https://installers\.lmstudio\.ai/linux/x64/([^/]+)/LM-Studio-([^/]+)-x64\.AppImage")
 
     try:
-        async with httpx.AsyncClient(timeout=20.0, follow_redirects=True) as client:
+        async with httpx.AsyncClient(timeout=20.0, follow_redirects=True, headers=DOWNLOAD_HTTP_HEADERS) as client:
             if discovery_page:
                 page = await client.get(discovery_page)
                 if page.status_code == 200:
@@ -498,6 +692,22 @@ async def resolve_download_url(app: dict, platform_key: str = PLATFORM_KEY, arch
         _URL_CACHE[cache_key] = out
         return dict(out)
 
+    pkg_strategy = (PACKAGE_MANAGER_STRATEGIES.get(app.get("app_id", "")) or {}).get(platform_key)
+    if pkg_strategy and not pkg_strategy.get("fallback_to_download", False):
+        out = {
+            "ok": True,
+            "classification": STATUS["INSTALLED_OK"],
+            "resolved_url": f"pkgmgr://{platform_key}/{app['app_id']}",
+            "http_status": None,
+            "fallback_used": None,
+            "content_length": None,
+            "content_type": "",
+            "etag": None,
+            "last_modified": None,
+        }
+        _URL_CACHE[cache_key] = out
+        return dict(out)
+
     strategy = (app.get("release_discovery_strategy") or {}).get("type", "stable_endpoint")
     candidate_urls: list[str] = []
     fallback_used = None
@@ -543,6 +753,16 @@ async def resolve_download_url(app: dict, platform_key: str = PLATFORM_KEY, arch
                 continue
             seen.add(item)
             unique_candidates.append(item)
+
+        if not unique_candidates:
+            out = {
+                "ok": False,
+                "classification": STATUS["URL_INVALID_OR_STALE"],
+                "resolved_url": "",
+                "message": "No download URL candidates were available",
+            }
+            _URL_CACHE[cache_key] = out
+            return dict(out)
 
         for idx, candidate in enumerate(unique_candidates):
             check = await _head_validate(candidate)
@@ -604,6 +824,11 @@ def _looks_like_html(sample: bytes, content_type: str) -> bool:
     return False
 
 
+def _starts_with_markup_payload(sample: bytes) -> bool:
+    probe = sample[:512].lstrip().lower()
+    return probe.startswith(b"<html") or probe.startswith(b"<!doctype") or probe.startswith(b"<?xml")
+
+
 def _is_release_page_url(url: str) -> bool:
     parsed = urlparse(url)
     return "/releases/tag/" in parsed.path.lower()
@@ -627,12 +852,29 @@ def validate_artifact_file(path: Path, fmt: str, content_type: str = "", final_u
         }
 
     size = path.stat().st_size
-    sample = _peek_bytes(path)
-    if _looks_like_html(sample, content_type):
+    sample = _peek_bytes(path, limit=512)
+    if _starts_with_markup_payload(sample):
+        try:
+            path.unlink(missing_ok=True)
+        except Exception:
+            pass
         return {
             "ok": False,
             "classification": STATUS["HTML_PAGE_DOWNLOADED_INSTEAD_OF_BINARY"],
-            "reason": "HTML payload downloaded instead of binary",
+            "reason": ANTI_BOT_PAYLOAD_ERROR,
+            "size": size,
+            "final_url": final_url,
+        }
+
+    if _looks_like_html(sample, content_type):
+        try:
+            path.unlink(missing_ok=True)
+        except Exception:
+            pass
+        return {
+            "ok": False,
+            "classification": STATUS["HTML_PAGE_DOWNLOADED_INSTEAD_OF_BINARY"],
+            "reason": ANTI_BOT_PAYLOAD_ERROR,
             "size": size,
             "final_url": final_url,
         }
@@ -656,6 +898,15 @@ def validate_artifact_file(path: Path, fmt: str, content_type: str = "", final_u
                 "final_url": final_url,
             }
 
+    if fmt == "exe" and not sample.startswith(b"MZ"):
+        return {
+            "ok": False,
+            "classification": STATUS["DOWNLOADED_INVALID_ARTIFACT"],
+            "reason": "Windows executable is missing MZ signature",
+            "size": size,
+            "final_url": final_url,
+        }
+
     if fmt in {"run", "sh"}:
         if not sample.startswith(b"#!") and not sample.startswith(b"\x7fELF"):
             return {
@@ -676,6 +927,14 @@ def validate_artifact_file(path: Path, fmt: str, content_type: str = "", final_u
         }
 
     if fmt in {"tar.gz", "tar.bz2"}:
+        if fmt == "tar.gz" and not sample.startswith(b"\x1f\x8b"):
+            return {
+                "ok": False,
+                "classification": STATUS["DOWNLOADED_INVALID_ARTIFACT"],
+                "reason": "gzip archive header invalid",
+                "size": size,
+                "final_url": final_url,
+            }
         try:
             mode = "r:gz" if fmt == "tar.gz" else "r:bz2"
             with tarfile.open(path, mode):
@@ -764,8 +1023,58 @@ async def _download_to_cache(app: dict, resolved: dict, emit: Emitter) -> dict:
             pass
 
     await emit("INFO", "INSTALLER", f"{app['display_name']}: Downloading installer", url, classification="DOWNLOAD_STARTED")
+    use_browser_download = SYSTEM == "Linux" and bool(app.get("linux_download_via_browser"))
     try:
-        async with httpx.AsyncClient(timeout=300.0, follow_redirects=True) as client:
+        if use_browser_download:
+            browser_result = await download_via_browser(url, cache_path)
+            final_url = browser_result.get("final_url", url)
+            size = cache_path.stat().st_size if cache_path.exists() else 0
+            validation = validate_artifact_file(cache_path, fmt, content_type="", final_url=final_url)
+            if not validation.get("ok"):
+                await emit(
+                    "WARN",
+                    "INSTALLER",
+                    f"{app['display_name']}: invalid downloaded artifact ({validation.get('reason')})",
+                    app["app_id"],
+                    classification=validation.get("classification", STATUS["DOWNLOADED_INVALID_ARTIFACT"]),
+                    resolved_url=final_url,
+                    content_type="",
+                    artifact_size=validation.get("size", size),
+                    remediation_hint="Do not use release/download HTML pages as binary URLs",
+                )
+                return {
+                    "ok": False,
+                    "classification": validation.get("classification", STATUS["DOWNLOADED_INVALID_ARTIFACT"]),
+                    "message": validation.get("reason", "Downloaded artifact validation failed"),
+                    "resolved_url": final_url,
+                    "redirect_chain": [],
+                    "content_type": "",
+                    "artifact_size": validation.get("size", size),
+                }
+
+            meta_path.write_text(json.dumps({
+                "resolved_url": final_url,
+                "size": size,
+                "content_type": "",
+                "redirect_chain": [],
+                "etag": resolved.get("etag"),
+                "last_modified": resolved.get("last_modified"),
+                "download_method": "playwright",
+            }, indent=2))
+            _ARTIFACT_CACHE[final_url] = cache_path
+            await emit("INFO", "INSTALLER", f"{app['display_name']}: Download complete ({size / (1024 * 1024):.1f} MB)", url, classification="DOWNLOADED")
+            return {
+                "ok": True,
+                "classification": "DOWNLOADED",
+                "path": cache_path,
+                "fmt": fmt,
+                "resolved_url": final_url,
+                "redirect_chain": [],
+                "content_type": "",
+                "artifact_size": size,
+            }
+
+        async with httpx.AsyncClient(timeout=300.0, follow_redirects=True, headers=DOWNLOAD_HTTP_HEADERS) as client:
             async with client.stream("GET", url) as resp:
                 if resp.status_code >= 400:
                     return {
@@ -948,6 +1257,127 @@ async def _install_artifact(path: Path, fmt: str, app: dict, emit: Emitter) -> t
     return False, ""
 
 
+async def download_via_browser(url: str, dest_path: Path) -> dict:
+    from playwright.async_api import async_playwright
+
+    headless = SYSTEM == "Linux" and not (os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"))
+    async with async_playwright() as pw:
+        browser = await pw.chromium.launch(
+            headless=headless,
+            args=["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu"],
+            timeout=30_000,
+        )
+        context = await browser.new_context(accept_downloads=True, ignore_https_errors=True)
+        page = await context.new_page()
+
+        try:
+            loop = asyncio.get_running_loop()
+            download_future: asyncio.Future = loop.create_future()
+
+            def _on_download(download):
+                if not download_future.done():
+                    download_future.set_result(download)
+
+            page.on("download", _on_download)
+            await page.goto("about:blank", wait_until="domcontentloaded")
+            await page.evaluate(
+                """
+                (downloadUrl) => {
+                    const a = document.createElement('a');
+                    a.href = downloadUrl;
+                    a.download = '';
+                    a.rel = 'noopener';
+                    document.body.appendChild(a);
+                    a.click();
+                }
+                """,
+                url,
+            )
+
+            try:
+                download = await asyncio.wait_for(download_future, timeout=180)
+            except asyncio.TimeoutError:
+                await page.goto(url, wait_until="domcontentloaded", timeout=120_000)
+                download = await asyncio.wait_for(download_future, timeout=60)
+
+            failure = await download.failure()
+            if failure:
+                raise RuntimeError(f"Browser download failed: {failure}")
+
+            await download.save_as(str(dest_path))
+            return {
+                "ok": True,
+                "final_url": download.url or url,
+            }
+        finally:
+            await context.close()
+            await browser.close()
+
+
+async def _install_via_package_manager(app: dict, emit: Emitter) -> dict:
+    strategy = _package_manager_strategy(app)
+    if not strategy:
+        return {"handled": False}
+
+    commands = strategy.get("commands") or []
+    fallback_to_download = bool(strategy.get("fallback_to_download", False))
+    attempts: list[dict] = []
+
+    if not commands:
+        return {
+            "handled": True,
+            "ok": False,
+            "classification": STATUS["INSTALLER_FAILED"],
+            "message": "No package-manager command configured for this platform",
+            "fallback_to_download": fallback_to_download,
+            "attempts": attempts,
+        }
+
+    for item in commands:
+        cmd = list(item.get("command") or [])
+        if not cmd:
+            continue
+
+        base = cmd[0]
+        if shutil.which(base) is None:
+            attempts.append({"command": " ".join(cmd), "return_code": 127, "message": f"Missing command: {base}"})
+            continue
+
+        variants = [cmd]
+        if SYSTEM == "Linux" and item.get("privileged"):
+            variants = _linux_privileged_cmds(cmd)
+
+        for variant in variants:
+            await emit(
+                "INFO",
+                "INSTALLER",
+                f"{app['display_name']}: running package-manager install command",
+                app["app_id"],
+                classification=STATUS["INSTALLER_STARTED"],
+                command=" ".join(variant),
+            )
+            rc = await _run_streaming(variant, emit, app["display_name"])
+            attempts.append({"command": " ".join(variant), "return_code": rc})
+            if rc == 0:
+                return {
+                    "handled": True,
+                    "ok": True,
+                    "classification": STATUS["INSTALLED_OK"],
+                    "message": "Package manager install completed",
+                    "resolved_url": f"pkgmgr://{PLATFORM_KEY}/{app['app_id']}",
+                    "attempts": attempts,
+                }
+
+    return {
+        "handled": True,
+        "ok": False,
+        "classification": STATUS["INSTALLER_FAILED"],
+        "message": "Package manager install commands failed",
+        "fallback_to_download": fallback_to_download,
+        "attempts": attempts,
+    }
+
+
 async def validate_install(app: dict) -> dict:
     pre = await preflight_install_state(app)
     if not pre["installed"]:
@@ -1099,6 +1529,72 @@ async def install_app(installer: dict, emit: Emitter, reinstall: bool = False) -
                 "validation_reason": validated.get("reason", ""),
             }
 
+        pkg_install = await _install_via_package_manager(app, emit)
+        if pkg_install.get("handled"):
+            if pkg_install.get("ok"):
+                validated = await validate_install(app)
+                final_binary = validated.get("binary_path") or pre.get("binary_path")
+                version = validated.get("version") or pre.get("version", "")
+                await emit(
+                    "ALERT",
+                    "INSTALLER",
+                    f"INSTALLED: {name}",
+                    app_id,
+                    classification=STATUS["INSTALLED_OK"],
+                    resolved_url=pkg_install.get("resolved_url", ""),
+                    binary_path=final_binary,
+                    version=version,
+                    validation_state="Validated" if validated.get("ok") else "Installed",
+                )
+                return {
+                    "app_id": app_id,
+                    "installed": True,
+                    "classification": STATUS["INSTALLED_OK"],
+                    "message": pkg_install.get("message", "Installed successfully"),
+                    "resolved_url": pkg_install.get("resolved_url", ""),
+                    "fallback_url_used": None,
+                    "http_status": None,
+                    "dns_status": "ok",
+                    "installed_path": "",
+                    "binary_path": final_binary,
+                    "version": version,
+                    "startable": validated.get("ok", False),
+                    "validation_passed": validated.get("ok", False),
+                    "validation_reason": validated.get("reason", ""),
+                    "attempts": pkg_install.get("attempts", []),
+                }
+
+            if not pkg_install.get("fallback_to_download", False):
+                await emit(
+                    "WARN",
+                    "INSTALLER",
+                    f"{name}: package-manager install failed",
+                    app_id,
+                    classification=pkg_install.get("classification", STATUS["INSTALLER_FAILED"]),
+                    remediation_hint=pkg_install.get("message", ""),
+                )
+                return {
+                    "app_id": app_id,
+                    "installed": False,
+                    "classification": pkg_install.get("classification", STATUS["INSTALLER_FAILED"]),
+                    "message": pkg_install.get("message", "Package manager install failed"),
+                    "resolved_url": pkg_install.get("resolved_url", ""),
+                    "fallback_url_used": None,
+                    "http_status": None,
+                    "dns_status": "unknown",
+                    "startable": False,
+                    "attempts": pkg_install.get("attempts", []),
+                }
+
+            await emit(
+                "WARN",
+                "INSTALLER",
+                f"{name}: package-manager install unavailable, falling back to artifact download",
+                app_id,
+                classification=STATUS["INSTALLER_FAILED"],
+                remediation_hint=pkg_install.get("message", ""),
+            )
+
         resolved = await resolve_download_url(app)
         if not resolved.get("ok"):
             await emit("WARN", "INSTALLER", f"{name}: URL resolution failed ({resolved.get('classification')})", app_id, classification=resolved.get("classification"), resolved_url=resolved.get("resolved_url", ""), http_status=resolved.get("http_status"), remediation_hint="Check app catalog URL strategy and fallback URLs")
@@ -1190,6 +1686,8 @@ async def install_group(group: list[dict], emit: Emitter, label: str, reinstall:
         install_type = (app.get(f"{PLATFORM_KEY}_install_type") or app.get("install_type") or "").lower()
         if install_type in ("manual", "pip"):
             resolution[app["app_id"]] = {"ok": True, "skip_download": True}
+        elif _package_manager_strategy(app) and not _supports_download_fallback(app):
+            resolution[app["app_id"]] = {"ok": True, "skip_download": True, "package_manager": True}
         else:
             resolution[app["app_id"]] = await resolve_download_url(app)
 
@@ -1282,6 +1780,37 @@ async def install_group(group: list[dict], emit: Emitter, label: str, reinstall:
                 "validation_reason": validated.get("reason", ""),
             })
             continue
+
+        if _package_manager_strategy(app):
+            pkg_install = await _install_via_package_manager(app, emit)
+            if pkg_install.get("ok"):
+                validated = await validate_install(app)
+                results.append({
+                    "app_id": app_id,
+                    "installed": True,
+                    "classification": STATUS["INSTALLED_OK"],
+                    "message": pkg_install.get("message", "Installed successfully"),
+                    "resolved_url": pkg_install.get("resolved_url", ""),
+                    "binary_path": validated.get("binary_path", ""),
+                    "version": validated.get("version", ""),
+                    "startable": validated.get("ok", False),
+                    "validation_passed": validated.get("ok", False),
+                    "validation_reason": validated.get("reason", ""),
+                    "attempts": pkg_install.get("attempts", []),
+                })
+                continue
+
+            if not pkg_install.get("fallback_to_download", False):
+                results.append({
+                    "app_id": app_id,
+                    "installed": False,
+                    "classification": pkg_install.get("classification", STATUS["INSTALLER_FAILED"]),
+                    "message": pkg_install.get("message", "Package manager install failed"),
+                    "resolved_url": pkg_install.get("resolved_url", ""),
+                    "startable": False,
+                    "attempts": pkg_install.get("attempts", []),
+                })
+                continue
 
         dl = downloads.get(app_id, {})
         resolved = resolution.get(app_id, {})

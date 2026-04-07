@@ -1,0 +1,1194 @@
+[
+  {
+    "id": "scn-vscode-copilot-no-login",
+    "title": "VS Code + GitHub Copilot prompt surface (no login)",
+    "description": "Install VS Code if needed, install Copilot extension, launch prompt surface without signing in.",
+    "category": "IDE Assistants",
+    "family": "VS Code Extensions",
+    "tags": [
+      "vscode",
+      "copilot",
+      "pre-auth",
+      "extension"
+    ],
+    "risk_level": "high",
+    "platforms": [
+      "linux",
+      "windows"
+    ],
+    "auth_required": false,
+    "prerequisites": [
+      "Internet access for extension download"
+    ],
+    "steps": [
+      {
+        "id": "s1",
+        "type": "install_application",
+        "params": {
+          "app_name": "vscode"
+        }
+      },
+      {
+        "id": "s2",
+        "type": "install_browser_extension",
+        "params": {
+          "target_app": "vscode",
+          "extension_id": "GitHub.copilot"
+        }
+      },
+      {
+        "id": "s3",
+        "type": "launch_application",
+        "params": {
+          "app_name": "vscode"
+        }
+      },
+      {
+        "id": "s4",
+        "type": "manual_checkpoint",
+        "params": {
+          "instruction": "Open Copilot Chat panel and verify pre-auth prompt UI appears.",
+          "timeout_seconds": 900
+        }
+      }
+    ],
+    "assertions": [
+      "Prompt UI visible without authenticated completion request"
+    ],
+    "expected_observables": [
+      "code process creation",
+      "extension install telemetry"
+    ],
+    "detector_expectations": [
+      "EDR process tree: code -> extension install",
+      "HTTP to VS Code marketplace"
+    ],
+    "cleanup_steps": [
+      "Close VS Code"
+    ],
+    "created_date": "2026-04-05T08:25:08.700778+00:00",
+    "last_run_date": null,
+    "status": "idle",
+    "metadata": {
+      "source": "built_in",
+      "is_template": false
+    }
+  },
+  {
+    "id": "scn-vscode-claude-code-no-login",
+    "title": "VS Code + Claude Code extension prompt surface (no login)",
+    "description": "Install VS Code if needed, install Claude extension, open assistant prompt surface without account login.",
+    "category": "IDE Assistants",
+    "family": "VS Code Extensions",
+    "tags": [
+      "vscode",
+      "claude",
+      "pre-auth",
+      "extension"
+    ],
+    "risk_level": "high",
+    "platforms": [
+      "linux",
+      "windows"
+    ],
+    "auth_required": false,
+    "prerequisites": [
+      "Internet access for extension download"
+    ],
+    "steps": [
+      {
+        "id": "s1",
+        "type": "install_application",
+        "params": {
+          "app_name": "vscode"
+        }
+      },
+      {
+        "id": "s2",
+        "type": "install_browser_extension",
+        "params": {
+          "target_app": "vscode",
+          "extension_id": "anthropic.claude-code"
+        }
+      },
+      {
+        "id": "s3",
+        "type": "launch_application",
+        "params": {
+          "app_name": "vscode"
+        }
+      },
+      {
+        "id": "s4",
+        "type": "manual_checkpoint",
+        "params": {
+          "instruction": "Open Claude extension panel and verify prompt surface appears before login.",
+          "timeout_seconds": 900
+        }
+      }
+    ],
+    "assertions": [
+      "Prompt panel reachable pre-auth"
+    ],
+    "expected_observables": [
+      "extension installation network call",
+      "IDE launch telemetry"
+    ],
+    "detector_expectations": [
+      "SIEM package install plus IDE plugin activity"
+    ],
+    "cleanup_steps": [
+      "Close VS Code"
+    ],
+    "created_date": "2026-04-05T08:25:08.701780+00:00",
+    "last_run_date": null,
+    "status": "idle",
+    "metadata": {
+      "source": "built_in",
+      "is_template": false
+    }
+  },
+  {
+    "id": "scn-claude-desktop-mcp-login",
+    "title": "Claude Desktop login + MCP connector workflow",
+    "description": "Install Claude desktop if available, complete login manually, install filesystem MCP server, inject config, then interact with tool.",
+    "category": "Agent + MCP Workflows",
+    "family": "Connector Provisioning",
+    "tags": [
+      "claude",
+      "mcp",
+      "post-auth",
+      "filesystem"
+    ],
+    "risk_level": "critical",
+    "platforms": [
+      "linux",
+      "windows",
+      "darwin"
+    ],
+    "auth_required": true,
+    "prerequisites": [
+      "Node/npm/npx recommended",
+      "Claude Desktop installed for real config path"
+    ],
+    "steps": [
+      {
+        "id": "s1",
+        "type": "install_application",
+        "params": {
+          "app_name": "claude_desktop"
+        }
+      },
+      {
+        "id": "s2",
+        "type": "manual_checkpoint",
+        "params": {
+          "instruction": "Log into Claude Desktop account and keep the app open.",
+          "timeout_seconds": 1200
+        }
+      },
+      {
+        "id": "s3",
+        "type": "mcp_install_server",
+        "params": {
+          "server_id": "filesystem"
+        }
+      },
+      {
+        "id": "s4",
+        "type": "mcp_inject_config",
+        "params": {
+          "server_ids": "filesystem"
+        }
+      },
+      {
+        "id": "s5",
+        "type": "manual_checkpoint",
+        "params": {
+          "instruction": "In Claude Desktop, invoke MCP filesystem tool and run a simple directory listing.",
+          "timeout_seconds": 1200
+        }
+      }
+    ],
+    "assertions": [
+      "MCP server installed",
+      "Config file modified",
+      "Manual MCP tool interaction recorded"
+    ],
+    "expected_observables": [
+      "npx process creation",
+      "config file integrity change"
+    ],
+    "detector_expectations": [
+      "FIM event for Claude config",
+      "EDR child process from assistant app"
+    ],
+    "cleanup_steps": [
+      "Restore MCP config if required"
+    ],
+    "created_date": "2026-04-05T08:25:08.701802+00:00",
+    "last_run_date": null,
+    "status": "idle",
+    "metadata": {
+      "source": "built_in",
+      "is_template": false
+    }
+  },
+  {
+    "id": "scn-google-ai-mode-eligible",
+    "title": "Google AI Mode prompt test (gated)",
+    "description": "Check Google AI Mode capability and, if eligible, open browser and submit a prompt.",
+    "category": "Search-Integrated AI",
+    "family": "Google AI Mode",
+    "tags": [
+      "google",
+      "ai-mode",
+      "browser",
+      "gated"
+    ],
+    "risk_level": "medium",
+    "platforms": [
+      "linux",
+      "windows",
+      "darwin"
+    ],
+    "auth_required": false,
+    "prerequisites": [
+      "Chromium available"
+    ],
+    "steps": [
+      {
+        "id": "s1",
+        "type": "capability_check",
+        "params": {
+          "capability": "google_ai_mode",
+          "fail_if_missing": false
+        }
+      },
+      {
+        "id": "s2",
+        "type": "open_website",
+        "params": {
+          "url": "https://www.google.com/search?q=ai+mode",
+          "requires_capability": "google_ai_mode"
+        }
+      },
+      {
+        "id": "s3",
+        "type": "click_selector",
+        "params": {
+          "selector": "textarea, input[name='q']"
+        }
+      },
+      {
+        "id": "s4",
+        "type": "type_text",
+        "params": {
+          "text": "Summarize zero trust controls for data exfiltration."
+        }
+      },
+      {
+        "id": "s5",
+        "type": "press_shortcut",
+        "params": {
+          "keys": "enter"
+        }
+      }
+    ],
+    "assertions": [
+      "Capability gate evaluated",
+      "Prompt submission attempted when eligible"
+    ],
+    "expected_observables": [
+      "browser DNS/HTTPS telemetry"
+    ],
+    "detector_expectations": [
+      "Search-integrated AI traffic in proxy logs"
+    ],
+    "cleanup_steps": [
+      "Close browser context"
+    ],
+    "created_date": "2026-04-05T08:25:08.701822+00:00",
+    "last_run_date": null,
+    "status": "idle",
+    "metadata": {
+      "source": "built_in",
+      "is_template": false
+    }
+  },
+  {
+    "id": "scn-perplexity-login-followup",
+    "title": "Perplexity login prompt + follow-up",
+    "description": "Open browser, pause for login, submit initial prompt and follow-up prompt.",
+    "category": "Search-Integrated AI",
+    "family": "Perplexity Follow-up",
+    "tags": [
+      "perplexity",
+      "browser",
+      "follow-up",
+      "auth"
+    ],
+    "risk_level": "high",
+    "platforms": [
+      "linux",
+      "windows",
+      "darwin"
+    ],
+    "auth_required": true,
+    "prerequisites": [
+      "Perplexity account"
+    ],
+    "steps": [
+      {
+        "id": "s1",
+        "type": "open_website",
+        "params": {
+          "url": "https://www.perplexity.ai"
+        }
+      },
+      {
+        "id": "s2",
+        "type": "manual_checkpoint",
+        "params": {
+          "instruction": "Complete Perplexity login, then resume.",
+          "timeout_seconds": 1200
+        }
+      },
+      {
+        "id": "s3",
+        "type": "click_selector",
+        "params": {
+          "selector": "textarea"
+        }
+      },
+      {
+        "id": "s4",
+        "type": "type_text",
+        "params": {
+          "text": "Provide a concise DLP policy gap checklist."
+        }
+      },
+      {
+        "id": "s5",
+        "type": "press_shortcut",
+        "params": {
+          "keys": "enter"
+        }
+      },
+      {
+        "id": "s6",
+        "type": "wait",
+        "params": {
+          "seconds": 4
+        }
+      },
+      {
+        "id": "s7",
+        "type": "type_text",
+        "params": {
+          "text": "Now prioritize the top three controls for first quarter rollout."
+        }
+      },
+      {
+        "id": "s8",
+        "type": "press_shortcut",
+        "params": {
+          "keys": "enter"
+        }
+      }
+    ],
+    "assertions": [
+      "Initial and follow-up prompts submitted"
+    ],
+    "expected_observables": [
+      "session cookies",
+      "prompt traffic",
+      "response render"
+    ],
+    "detector_expectations": [
+      "Auth plus AI search usage in web telemetry"
+    ],
+    "cleanup_steps": [
+      "Close browser context"
+    ],
+    "created_date": "2026-04-05T08:25:08.701843+00:00",
+    "last_run_date": null,
+    "status": "idle",
+    "metadata": {
+      "source": "built_in",
+      "is_template": false
+    }
+  },
+  {
+    "id": "scn-ollama-local-prompt",
+    "title": "Ollama local prompt baseline",
+    "description": "Install Ollama, pull small model, submit local prompt, and verify local API response markers.",
+    "category": "Local Model Tools",
+    "family": "Ollama Baseline",
+    "tags": [
+      "ollama",
+      "local",
+      "offline",
+      "model-pull"
+    ],
+    "risk_level": "medium",
+    "platforms": [
+      "linux",
+      "windows",
+      "darwin"
+    ],
+    "auth_required": false,
+    "prerequisites": [
+      "Enough disk for model pull"
+    ],
+    "steps": [
+      {
+        "id": "s1",
+        "type": "install_application",
+        "params": {
+          "app_name": "ollama"
+        }
+      },
+      {
+        "id": "s2",
+        "type": "launch_application",
+        "params": {
+          "app_name": "ollama"
+        }
+      },
+      {
+        "id": "s3",
+        "type": "pull_local_model",
+        "params": {
+          "model": "llama3.2:1b"
+        }
+      },
+      {
+        "id": "s4",
+        "type": "open_website",
+        "params": {
+          "url": "http://127.0.0.1:11434/api/tags"
+        }
+      },
+      {
+        "id": "s5",
+        "type": "assert_text_contains",
+        "params": {
+          "expected": "models"
+        }
+      }
+    ],
+    "assertions": [
+      "Local model pull completed",
+      "Local API tags endpoint reachable"
+    ],
+    "expected_observables": [
+      "localhost inference service traffic",
+      "model artifact pull"
+    ],
+    "detector_expectations": [
+      "No cloud API calls required for prompt"
+    ],
+    "cleanup_steps": [
+      "Close Ollama process"
+    ],
+    "created_date": "2026-04-05T08:25:08.701863+00:00",
+    "last_run_date": null,
+    "status": "idle",
+    "metadata": {
+      "source": "built_in",
+      "is_template": false
+    }
+  },
+  {
+    "id": "scn-browser-output-to-vscode",
+    "title": "Browser AI output copied to VS Code",
+    "description": "Submit browser AI prompt, copy response text, then paste into VS Code editor.",
+    "category": "Cross-App Chained Workflows",
+    "family": "Browser-to-IDE",
+    "tags": [
+      "copy-paste",
+      "browser",
+      "vscode",
+      "exfil"
+    ],
+    "risk_level": "critical",
+    "platforms": [
+      "linux",
+      "windows"
+    ],
+    "auth_required": false,
+    "prerequisites": [
+      "VS Code available",
+      "Browser access to AI site"
+    ],
+    "steps": [
+      {
+        "id": "s1",
+        "type": "open_website",
+        "params": {
+          "url": "https://chatgpt.com"
+        }
+      },
+      {
+        "id": "s2",
+        "type": "click_selector",
+        "params": {
+          "selector": "textarea"
+        }
+      },
+      {
+        "id": "s3",
+        "type": "type_text",
+        "params": {
+          "text": "Generate a short code snippet with fake API key placeholder."
+        }
+      },
+      {
+        "id": "s4",
+        "type": "press_shortcut",
+        "params": {
+          "keys": "enter"
+        }
+      },
+      {
+        "id": "s5",
+        "type": "wait",
+        "params": {
+          "seconds": 5
+        }
+      },
+      {
+        "id": "s6",
+        "type": "copy_text",
+        "params": {
+          "text": "SIMULATED_BROWSER_AI_OUTPUT_TOKEN_12345"
+        }
+      },
+      {
+        "id": "s7",
+        "type": "launch_application",
+        "params": {
+          "app_name": "vscode"
+        }
+      },
+      {
+        "id": "s8",
+        "type": "manual_checkpoint",
+        "params": {
+          "instruction": "Focus VS Code editor, then resume for paste simulation.",
+          "timeout_seconds": 900
+        }
+      },
+      {
+        "id": "s9",
+        "type": "paste_text",
+        "params": {}
+      },
+      {
+        "id": "s10",
+        "type": "assert_clipboard_contains",
+        "params": {
+          "expected": "SIMULATED_BROWSER_AI_OUTPUT_TOKEN"
+        }
+      }
+    ],
+    "assertions": [
+      "Clipboard relay from browser to IDE observed"
+    ],
+    "expected_observables": [
+      "clipboard access",
+      "cross-app context movement"
+    ],
+    "detector_expectations": [
+      "Potential exfil pathway from web AI output to codebase"
+    ],
+    "cleanup_steps": [
+      "Clear clipboard",
+      "Close VS Code"
+    ],
+    "created_date": "2026-04-05T08:25:08.701900+00:00",
+    "last_run_date": null,
+    "status": "idle",
+    "metadata": {
+      "source": "built_in",
+      "is_template": false
+    }
+  },
+  {
+    "id": "scn-upload-file-summary",
+    "title": "Upload sample file and request summary",
+    "description": "Upload sample text/csv/pdf to browser AI tool and request summary output.",
+    "category": "File/Data Transfer Simulations",
+    "family": "Upload + Summary",
+    "tags": [
+      "upload",
+      "summary",
+      "browser",
+      "data-transfer"
+    ],
+    "risk_level": "critical",
+    "platforms": [
+      "linux",
+      "windows",
+      "darwin"
+    ],
+    "auth_required": true,
+    "prerequisites": [
+      "User account for target browser AI tool",
+      "Sample files present"
+    ],
+    "steps": [
+      {
+        "id": "s1",
+        "type": "open_website",
+        "params": {
+          "url": "https://chatgpt.com"
+        }
+      },
+      {
+        "id": "s2",
+        "type": "manual_checkpoint",
+        "params": {
+          "instruction": "Complete login and open file-upload capable chat.",
+          "timeout_seconds": 1200
+        }
+      },
+      {
+        "id": "s3",
+        "type": "upload_file",
+        "params": {
+          "selector": "input[type='file']",
+          "path": "simulator_data/scenarios/samples/sample_brief.txt"
+        }
+      },
+      {
+        "id": "s4",
+        "type": "type_text",
+        "params": {
+          "text": "Summarize this file and list sensitive fields."
+        }
+      },
+      {
+        "id": "s5",
+        "type": "press_shortcut",
+        "params": {
+          "keys": "enter"
+        }
+      },
+      {
+        "id": "s6",
+        "type": "capture_screenshot",
+        "params": {
+          "path": "simulator_data/scenarios/screenshots/upload-summary.png"
+        }
+      }
+    ],
+    "assertions": [
+      "File upload action recorded",
+      "Summary request submitted"
+    ],
+    "expected_observables": [
+      "multipart upload",
+      "chat prompt with file context"
+    ],
+    "detector_expectations": [
+      "DLP should flag sensitive file transfer to AI domain"
+    ],
+    "cleanup_steps": [
+      "Delete uploaded chat asset where supported"
+    ],
+    "created_date": "2026-04-05T08:25:08.701921+00:00",
+    "last_run_date": null,
+    "status": "idle",
+    "metadata": {
+      "source": "built_in",
+      "is_template": false
+    }
+  },
+  {
+    "id": "tpl-installation-footprint",
+    "title": "Template - Installation footprint test",
+    "description": "Template scenario for installer telemetry, artifact, and launch validation.",
+    "category": "Desktop AI Apps",
+    "family": "Installation Footprint",
+    "tags": [
+      "template",
+      "installation",
+      "footprint"
+    ],
+    "risk_level": "medium",
+    "platforms": [
+      "any"
+    ],
+    "auth_required": false,
+    "prerequisites": [
+      "Choose target app"
+    ],
+    "steps": [
+      {
+        "id": "s1",
+        "type": "install_application",
+        "params": {
+          "app_name": "cursor"
+        }
+      },
+      {
+        "id": "s2",
+        "type": "launch_application",
+        "params": {
+          "app_name": "cursor"
+        }
+      },
+      {
+        "id": "s3",
+        "type": "capture_screenshot",
+        "params": {}
+      }
+    ],
+    "assertions": [
+      "Installer and process telemetry generated"
+    ],
+    "expected_observables": [
+      "download + install event sequence"
+    ],
+    "detector_expectations": [
+      "EDR process lineage and package source visibility"
+    ],
+    "cleanup_steps": [
+      "Stop target app"
+    ],
+    "created_date": "2026-04-05T08:25:08.701941+00:00",
+    "last_run_date": null,
+    "status": "idle",
+    "metadata": {
+      "source": "built_in",
+      "is_template": true
+    }
+  },
+  {
+    "id": "tpl-pre-auth-use",
+    "title": "Template - Pre-auth use test",
+    "description": "Template for prompt surface checks before account login.",
+    "category": "IDE Assistants",
+    "family": "Pre-Auth Prompting",
+    "tags": [
+      "template",
+      "pre-auth"
+    ],
+    "risk_level": "high",
+    "platforms": [
+      "any"
+    ],
+    "auth_required": false,
+    "prerequisites": [
+      "Target app installed"
+    ],
+    "steps": [
+      {
+        "id": "s1",
+        "type": "launch_application",
+        "params": {
+          "app_name": "vscode"
+        }
+      },
+      {
+        "id": "s2",
+        "type": "manual_checkpoint",
+        "params": {
+          "instruction": "Open assistant panel and verify pre-auth prompt surface."
+        }
+      }
+    ],
+    "assertions": [
+      "Pre-auth prompt surface observed"
+    ],
+    "expected_observables": [
+      "UI access path prior to identity controls"
+    ],
+    "detector_expectations": [
+      "Should be visible in endpoint interaction telemetry"
+    ],
+    "cleanup_steps": [
+      "Close app"
+    ],
+    "created_date": "2026-04-05T08:25:08.701960+00:00",
+    "last_run_date": null,
+    "status": "idle",
+    "metadata": {
+      "source": "built_in",
+      "is_template": true
+    }
+  },
+  {
+    "id": "tpl-post-auth-use",
+    "title": "Template - Post-auth use test",
+    "description": "Template for gated flows that continue after login checkpoint.",
+    "category": "Desktop AI Apps",
+    "family": "Post-Auth Prompting",
+    "tags": [
+      "template",
+      "post-auth"
+    ],
+    "risk_level": "high",
+    "platforms": [
+      "any"
+    ],
+    "auth_required": true,
+    "prerequisites": [
+      "Valid account for target service"
+    ],
+    "steps": [
+      {
+        "id": "s1",
+        "type": "manual_checkpoint",
+        "params": {
+          "instruction": "Complete login and MFA in target app."
+        }
+      },
+      {
+        "id": "s2",
+        "type": "type_text",
+        "params": {
+          "text": "Post-auth prompt simulation"
+        }
+      }
+    ],
+    "assertions": [
+      "Post-auth prompt interaction captured"
+    ],
+    "expected_observables": [
+      "Auth success followed by AI usage"
+    ],
+    "detector_expectations": [
+      "Identity and usage events should correlate"
+    ],
+    "cleanup_steps": [
+      "Logout if possible"
+    ],
+    "created_date": "2026-04-05T08:25:08.701994+00:00",
+    "last_run_date": null,
+    "status": "idle",
+    "metadata": {
+      "source": "built_in",
+      "is_template": true
+    }
+  },
+  {
+    "id": "tpl-file-upload",
+    "title": "Template - File upload test",
+    "description": "Template for uploading sample files into browser AI tools.",
+    "category": "File/Data Transfer Simulations",
+    "family": "Upload + Summary",
+    "tags": [
+      "template",
+      "upload"
+    ],
+    "risk_level": "critical",
+    "platforms": [
+      "any"
+    ],
+    "auth_required": true,
+    "prerequisites": [
+      "Authenticated browser AI session"
+    ],
+    "steps": [
+      {
+        "id": "s1",
+        "type": "open_website",
+        "params": {
+          "url": "https://chatgpt.com"
+        }
+      },
+      {
+        "id": "s2",
+        "type": "upload_file",
+        "params": {
+          "selector": "input[type='file']",
+          "path": "simulator_data/scenarios/samples/sample_metrics.csv"
+        }
+      },
+      {
+        "id": "s3",
+        "type": "type_text",
+        "params": {
+          "text": "Summarize uploaded file."
+        }
+      }
+    ],
+    "assertions": [
+      "Upload event generated"
+    ],
+    "expected_observables": [
+      "File transfer and prompt metadata"
+    ],
+    "detector_expectations": [
+      "DLP and CASB should surface upload"
+    ],
+    "cleanup_steps": [
+      "Delete uploaded file context"
+    ],
+    "created_date": "2026-04-05T08:25:08.702014+00:00",
+    "last_run_date": null,
+    "status": "idle",
+    "metadata": {
+      "source": "built_in",
+      "is_template": true
+    }
+  },
+  {
+    "id": "tpl-copy-paste-exfil",
+    "title": "Template - Copy/paste exfil simulation",
+    "description": "Template for clipboard relay from one AI surface to another app.",
+    "category": "Cross-App Chained Workflows",
+    "family": "Clipboard Relay",
+    "tags": [
+      "template",
+      "clipboard",
+      "exfil"
+    ],
+    "risk_level": "critical",
+    "platforms": [
+      "any"
+    ],
+    "auth_required": false,
+    "prerequisites": [
+      "Two app contexts available"
+    ],
+    "steps": [
+      {
+        "id": "s1",
+        "type": "copy_text",
+        "params": {
+          "text": "SIMULATED_SECRET_VALUE"
+        }
+      },
+      {
+        "id": "s2",
+        "type": "paste_text",
+        "params": {}
+      },
+      {
+        "id": "s3",
+        "type": "assert_clipboard_contains",
+        "params": {
+          "expected": "SIMULATED_SECRET_VALUE"
+        }
+      }
+    ],
+    "assertions": [
+      "Clipboard relay path validated"
+    ],
+    "expected_observables": [
+      "clipboard read/write operations"
+    ],
+    "detector_expectations": [
+      "Potential cross-app sensitive movement alert"
+    ],
+    "cleanup_steps": [
+      "Clear clipboard"
+    ],
+    "created_date": "2026-04-05T08:25:08.702034+00:00",
+    "last_run_date": null,
+    "status": "idle",
+    "metadata": {
+      "source": "built_in",
+      "is_template": true
+    }
+  },
+  {
+    "id": "tpl-mcp-connector",
+    "title": "Template - MCP/tool connector test",
+    "description": "Template for package install and config injection behavior of MCP connectors.",
+    "category": "Agent + MCP Workflows",
+    "family": "Connector Provisioning",
+    "tags": [
+      "template",
+      "mcp"
+    ],
+    "risk_level": "critical",
+    "platforms": [
+      "any"
+    ],
+    "auth_required": false,
+    "prerequisites": [
+      "Node toolchain preferred"
+    ],
+    "steps": [
+      {
+        "id": "s1",
+        "type": "mcp_install_server",
+        "params": {
+          "server_id": "filesystem"
+        }
+      },
+      {
+        "id": "s2",
+        "type": "mcp_inject_config",
+        "params": {
+          "server_ids": "filesystem"
+        }
+      },
+      {
+        "id": "s3",
+        "type": "manual_checkpoint",
+        "params": {
+          "instruction": "Launch AI desktop client and validate MCP server appears in tool list."
+        }
+      }
+    ],
+    "assertions": [
+      "MCP package + config modifications"
+    ],
+    "expected_observables": [
+      "npx/pip process plus FIM changes"
+    ],
+    "detector_expectations": [
+      "EDR and config integrity detections expected"
+    ],
+    "cleanup_steps": [
+      "Restore backup config"
+    ],
+    "created_date": "2026-04-05T08:25:08.702053+00:00",
+    "last_run_date": null,
+    "status": "idle",
+    "metadata": {
+      "source": "built_in",
+      "is_template": true
+    }
+  },
+  {
+    "id": "tpl-cross-app-chain",
+    "title": "Template - Multi-step cross-app workflow",
+    "description": "Template for chaining browser and desktop actions in one run.",
+    "category": "Cross-App Chained Workflows",
+    "family": "Cross-App Relay",
+    "tags": [
+      "template",
+      "cross-app"
+    ],
+    "risk_level": "high",
+    "platforms": [
+      "any"
+    ],
+    "auth_required": false,
+    "prerequisites": [
+      "Browser and desktop targets available"
+    ],
+    "steps": [
+      {
+        "id": "s1",
+        "type": "open_website",
+        "params": {
+          "url": "https://chatgpt.com"
+        }
+      },
+      {
+        "id": "s2",
+        "type": "copy_text",
+        "params": {
+          "text": "CHAINED_OUTPUT"
+        }
+      },
+      {
+        "id": "s3",
+        "type": "launch_application",
+        "params": {
+          "app_name": "vscode"
+        }
+      },
+      {
+        "id": "s4",
+        "type": "paste_text",
+        "params": {}
+      }
+    ],
+    "assertions": [
+      "Cross-app sequence completed"
+    ],
+    "expected_observables": [
+      "browser + desktop + clipboard telemetry"
+    ],
+    "detector_expectations": [
+      "Correlated multi-app behavior visible in SIEM"
+    ],
+    "cleanup_steps": [
+      "Close browser and app"
+    ],
+    "created_date": "2026-04-05T08:25:08.702072+00:00",
+    "last_run_date": null,
+    "status": "idle",
+    "metadata": {
+      "source": "built_in",
+      "is_template": true
+    }
+  },
+  {
+    "id": "tpl-local-model-only",
+    "title": "Template - Local-model-only workflow",
+    "description": "Template for fully local model runtime prompting.",
+    "category": "Local Model Tools",
+    "family": "Offline Local Prompting",
+    "tags": [
+      "template",
+      "local-model"
+    ],
+    "risk_level": "medium",
+    "platforms": [
+      "any"
+    ],
+    "auth_required": false,
+    "prerequisites": [
+      "Local runtime available"
+    ],
+    "steps": [
+      {
+        "id": "s1",
+        "type": "install_application",
+        "params": {
+          "app_name": "ollama"
+        }
+      },
+      {
+        "id": "s2",
+        "type": "pull_local_model",
+        "params": {
+          "model": "llama3.2:1b"
+        }
+      },
+      {
+        "id": "s3",
+        "type": "open_website",
+        "params": {
+          "url": "http://127.0.0.1:11434/api/tags"
+        }
+      },
+      {
+        "id": "s4",
+        "type": "assert_text_contains",
+        "params": {
+          "expected": "models"
+        }
+      }
+    ],
+    "assertions": [
+      "Local runtime prompt path confirmed"
+    ],
+    "expected_observables": [
+      "Loopback traffic only"
+    ],
+    "detector_expectations": [
+      "No cloud egress expected"
+    ],
+    "cleanup_steps": [
+      "Stop local runtime"
+    ],
+    "created_date": "2026-04-05T08:25:08.702091+00:00",
+    "last_run_date": null,
+    "status": "idle",
+    "metadata": {
+      "source": "built_in",
+      "is_template": true
+    }
+  }
+]

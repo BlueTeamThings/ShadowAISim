@@ -23,6 +23,8 @@ function showSection(id) {
 
   if (id === "reports") refreshSummary();
   if (id === "installers") refreshInstallers();
+  if (id === "workflows" && typeof initWorkflowPage === "function") initWorkflowPage();
+  if (id === "scenarios" && typeof initScenarioPage === "function") initScenarioPage();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -279,10 +281,34 @@ function now() {
 // ─────────────────────────────────────────────────────────────────────────────
 async function startAudit() {
   if (auditRunning) return;
+
+  const includeScenarios = Boolean(document.getElementById("audit-include-scenarios")?.checked);
+
   auditRunning = true;
   document.getElementById("audit-idle").classList.add("hidden");
   document.getElementById("audit-running").classList.remove("hidden");
-  await apiPost("/api/audit/start");
+  try {
+    const resp = await fetch("/api/audit/start", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ include_scenarios: includeScenarios }),
+    });
+    const data = await resp.json().catch(() => ({}));
+
+    if (!resp.ok || data.started === false) {
+      const reason = data.reason || data.error || `Request failed (${resp.status})`;
+      appendTerminalLine({ level: "ERROR", category: "UI", message: `Audit start failed: ${reason}`, ts: now() });
+      auditRunning = false;
+      document.getElementById("audit-running").classList.add("hidden");
+      document.getElementById("audit-idle").classList.remove("hidden");
+      return;
+    }
+  } catch (err) {
+    appendTerminalLine({ level: "ERROR", category: "UI", message: `Audit start failed: ${err}`, ts: now() });
+    auditRunning = false;
+    document.getElementById("audit-running").classList.add("hidden");
+    document.getElementById("audit-idle").classList.remove("hidden");
+  }
 }
 
 function handleAuditPhase(entry) {
@@ -294,6 +320,7 @@ function handleAuditPhase(entry) {
     if (msg.includes("PHASE 2")) phase.textContent = "Phase 2: API Probes";
     if (msg.includes("PHASE 3")) phase.textContent = "Phase 3: Installers";
     if (msg.includes("PHASE 4")) phase.textContent = "Phase 4: MCP Servers";
+    if (msg.includes("PHASE 5")) phase.textContent = "Phase 5: Scenario Queue";
     if (msg.includes("AUDIT COMPLETE")) {
       auditRunning = false;
       document.getElementById("audit-running").classList.add("hidden");

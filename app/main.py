@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.routes import stream, web_leakage, api_probe, installers, audit, reports, mcp_servers, preflight
+from app.routes import stream, web_leakage, api_probe, installers, audit, reports, mcp_servers, preflight, workflows, scenarios
 
 BASE_DIR    = Path(__file__).parent.parent
 STATIC_DIR  = BASE_DIR / "static"
@@ -25,6 +25,8 @@ app.include_router(audit.router)
 app.include_router(mcp_servers.router)
 app.include_router(reports.router)
 app.include_router(preflight.router)
+app.include_router(workflows.router)
+app.include_router(scenarios.router)
 
 
 @app.get("/")

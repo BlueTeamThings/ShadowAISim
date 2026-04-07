@@ -86,6 +86,19 @@ class TestInstallerClassification(unittest.TestCase):
         self.assertFalse(out["ok"])
         self.assertEqual(out["classification"], STATUS["UNVERIFIED_LINUX_ASSET_URL"])
 
+    def test_package_manager_strategy_resolves_to_pkgmgr_url(self):
+        app = {
+            "app_id": "vscode",
+            "display_name": "VS Code",
+            "supported_platforms": ["linux", "windows"],
+            "release_discovery_strategy": {"type": "package_manager"},
+            "download_url": "",
+            "fallback_urls": [],
+        }
+        out = _run(installers.resolve_download_url(app, platform_key="linux", arch_key="x64"))
+        self.assertTrue(out["ok"])
+        self.assertTrue(out["resolved_url"].startswith("pkgmgr://linux/vscode"))
+
 
 class TestArtifactValidation(unittest.TestCase):
 
@@ -94,18 +107,33 @@ class TestArtifactValidation(unittest.TestCase):
             target = Path(td) / "bad.AppImage"
             target.write_text("<!DOCTYPE html><html><body>Not a binary</body></html>")
             out = installers.validate_artifact_file(target, "appimage", content_type="text/html", final_url="https://example.com/release")
+            exists_after = target.exists()
 
         self.assertFalse(out["ok"])
         self.assertEqual(out["classification"], STATUS["HTML_PAGE_DOWNLOADED_INSTEAD_OF_BINARY"])
+        self.assertEqual(out.get("reason"), "Installer Error: CDN Anti-bot triggered. Received HTML instead of executable binary.")
+        self.assertFalse(exists_after)
 
     def test_lmstudio_landing_page_used_as_binary_fails_validation(self):
         with tempfile.TemporaryDirectory() as td:
             target = Path(td) / "LM-Studio.AppImage"
             target.write_text("<html><body>download page</body></html>")
             out = installers.validate_artifact_file(target, "appimage", content_type="text/html", final_url="https://lmstudio.ai/download")
+            exists_after = target.exists()
 
         self.assertFalse(out["ok"])
         self.assertEqual(out["classification"], STATUS["HTML_PAGE_DOWNLOADED_INSTEAD_OF_BINARY"])
+        self.assertFalse(exists_after)
+
+    def test_invalid_exe_magic_bytes_blocked(self):
+        with tempfile.TemporaryDirectory() as td:
+            target = Path(td) / "bad.exe"
+            target.write_bytes(b"NOT-EXE" + b"\x00" * (300 * 1024))
+            out = installers.validate_artifact_file(target, "exe", content_type="application/octet-stream", final_url="https://example.com/tool.exe")
+
+        self.assertFalse(out["ok"])
+        self.assertEqual(out["classification"], STATUS["DOWNLOADED_INVALID_ARTIFACT"])
+        self.assertIn("MZ", out.get("reason", ""))
 
     def test_start_disabled_until_binary_validation_passes(self):
         from app.routes import installers as installer_routes
@@ -206,6 +234,33 @@ class TestInstallFlowBehavior(unittest.TestCase):
 
         self.assertFalse(out["installed"])
         self.assertEqual(out["classification"], STATUS["HTML_PAGE_DOWNLOADED_INSTEAD_OF_BINARY"])
+
+    def test_package_manager_success_skips_download_path(self):
+        app = {
+            "app_id": "vscode",
+            "display_name": "VS Code",
+            "supported_platforms": ["linux", "windows"],
+            "install_type": "package_manager",
+            "release_discovery_strategy": {"type": "package_manager"},
+            "download_url": "",
+            "fallback_urls": [],
+            "binary_name": "code",
+            "launch_strategy": "binary",
+            "post_install_validation_command": ["code", "--version"],
+        }
+
+        async def _emit(*a, **kw):
+            return None
+
+        with patch("app.automation.installers.preflight_install_state", new=AsyncMock(return_value={"installed": False, "binary_path": "", "version": "", "healthy": None})), \
+             patch("app.automation.installers._install_via_package_manager", new=AsyncMock(return_value={"handled": True, "ok": True, "resolved_url": "pkgmgr://linux/vscode", "message": "ok", "attempts": []})), \
+             patch("app.automation.installers.validate_install", new=AsyncMock(return_value={"ok": True, "binary_path": "/usr/bin/code", "version": "1.0", "reason": "ok"})), \
+             patch("app.automation.installers.resolve_download_url", new=AsyncMock(side_effect=AssertionError("resolve_download_url should not be called"))):
+            out = _run(installers.install_app(app, _emit))
+
+        self.assertTrue(out["installed"])
+        self.assertEqual(out["classification"], STATUS["INSTALLED_OK"])
+        self.assertTrue(out.get("resolved_url", "").startswith("pkgmgr://"))
 
 
 class TestStartAvailability(unittest.TestCase):
